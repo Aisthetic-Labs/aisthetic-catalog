@@ -12,14 +12,15 @@ class Settings(BaseSettings):
     OPENSEARCH_USER: str | None = Field(default=None)
     OPENSEARCH_PASSWORD: str | None = Field(default=None)
 
-    # Embeddings (OpenAI / Azure OpenAI compatible)
+    # Embeddings (OpenAI)
     EMBEDDING_MODEL_NAME: str = Field(default="text-embedding-3-small")
     EMBEDDING_API_KEY: str = Field(default="")
-    EMBEDDING_API_BASE: str = Field(default="")  # leave empty for normal OpenAI; set for Azure etc.
 
     # Image embedding service URL (if any)
     REPLICATE_API_TOKEN: str = Field(default="")
     REPLICATE_IMAGE_EMBEDDING_MODEL: str = Field(default="openai/clip")
+
+    STYLIST_MODEL_NAME: str = "gpt-4.1-mini"
 
     class Config:
         env_file = ".env"

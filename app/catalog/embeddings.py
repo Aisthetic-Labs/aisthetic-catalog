@@ -12,13 +12,8 @@ _rep_client: replicate.Client | None = None
 def get_oa_client() -> AsyncOpenAI:
     global _oa_client
     if _oa_client is None:
-        kwargs = {}
-        if settings.EMBEDDING_API_BASE:
-            kwargs["base_url"] = settings.EMBEDDING_API_BASE
-
         _oa_client = AsyncOpenAI(
-            api_key=settings.EMBEDDING_API_KEY,
-            **kwargs,
+            api_key=settings.EMBEDDING_API_KEY
         )
     return _oa_client
 
