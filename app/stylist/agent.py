@@ -4,12 +4,12 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.logger import logger
 from app.catalog.dto import CatalogSearchRequest, CatalogFilter
 from app.catalog.models_tenant import Product
 from app.catalog.search import search_products
 from app.core.config import settings
 from app.llm.client import get_chat_client
+from app.logger import logger
 from app.stylist.dto import StylistChatRequest, StylistResponse, ChatTurn
 from app.stylist.intent_detection import detect_intent
 from app.stylist.intents import StylistIntent
@@ -64,14 +64,23 @@ async def _stylist_llm_call(
     """
     mode: "freeform", "compare", "occasion"
     """
+
     system_prompt = (
-        "You are Aisthetic, a friendly but sharp fashion stylist AI.\n"
-        "You must always:\n"
+        "You are Aisthetic, a playful, hype but honest AI fashion stylist for Gen Z and young millennials.\n"
+        "Your vibe: casual, friendly, confident. No corporate tone.\n\n"
+        "Hard rules:\n"
+        "- Answer in ONLY 1–2 sentences, max 40 words total.\n"
+        "- You may use at most ONE emoji, and only if it feels natural.\n"
         "- Respect the user's style preferences and constraints from persona.\n"
-        "- Recommend only from the candidate products provided.\n"
-        "- Explain your reasoning in simple language.\n"
-        "- If products are not suitable, say that honestly and suggest what to look for instead.\n"
-        "Respond in JSON with keys: answer, recommended_product_ids, chosen_product_id."
+        "- Recommend only from the candidate_products list. Never invent products.\n"
+        "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n\n"
+        "Output format (JSON ONLY, no extra text):\n"
+        "{\n"
+        '  "answer": "<your short message>",\n'
+        '  "recommended_product_ids": ["product_id_1", "product_id_2"],\n'
+        '  "chosen_product_id": "product_id_1_or_null"\n'
+        "}\n"
+        "Do not add any other keys. Do not add explanations or markdown."
     )
 
     user_payload = {
@@ -89,19 +98,15 @@ async def _stylist_llm_call(
             {
                 "role": "user",
                 "content": (
-                    "Here is the user persona and candidate products. "
-                    "Think step by step, then output a JSON object:\n"
-                    "{\n"
-                    '  "answer": "natural language advice",\n'
-                    '  "recommended_product_ids": ["uuid1", "uuid2"],\n'
-                    '  "chosen_product_id": "uuid-or-null"\n'
-                    "}\n\n"
+                    "Here is the user persona, the current mode, the user message, and candidate products.\n"
+                    "Think through your reasoning silently, but DO NOT write the reasoning out.\n"
+                    "Respond ONLY with a single JSON object matching the specified schema.\n\n"
                     f"INPUT:\n{user_payload}"
                 ),
             },
         ],
         response_format={"type": "json_object"},
-        max_tokens=600,
+        max_tokens=200,  # shorter to discourage rambly answers
     )
 
     content = resp.choices[0].message.content
