@@ -12,6 +12,7 @@ from app.catalog.opensearch_client import (
     get_opensearch_client,
     get_catalog_index_name,
 )
+from app.logger import logger
 
 
 def ensure_index_exists(
@@ -236,11 +237,16 @@ async def ingest_products(
     """
     ingested_products: List[Product] = []
 
+    logger.info(f"Ingesting {len(products)} products for merchant {merchant_id}")
+
     for p in products:
         product = await upsert_product(session, p)
         ingested_products.append(product)
 
     await session.commit()
+
+    logger.info(f"Upserted {len(ingested_products)} products into Postgres for merchant {merchant_id}")
+    logger.info(f"Indexing {len(ingested_products)} products into OpenSearch")
 
     client = get_opensearch_client()
     index_name = get_catalog_index_name(merchant_id)
@@ -254,5 +260,6 @@ async def ingest_products(
             body=doc,
             refresh=True,  # dev mode; optimize later
         )
+    logger.info(f"Indexed {len(ingested_products)} products into OpenSearch")
 
     return len(ingested_products)
