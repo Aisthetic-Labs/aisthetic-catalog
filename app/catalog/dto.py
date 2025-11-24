@@ -20,6 +20,7 @@ class MerchantProductIn(BaseModel):
     brand: Optional[str] = None
     pattern: Optional[str] = None
     images: List[HttpUrl]
+    primary_image: HttpUrl
     variants: Optional[List[Dict]] = None
 
 

@@ -132,6 +132,17 @@ async def upsert_product(session: AsyncSession, data: MerchantProductIn) -> Prod
     await session.execute(
         ProductImage.__table__.delete().where(ProductImage.product_id == product.id)
     )
+    # Add primary image
+    if not data.primary_image:
+        raise ValueError("Primary image is required")
+
+    img = ProductImage(
+        product_id=product.id,
+        image_url=str(data.primary_image),
+        position=0,
+    )
+    session.add(img)
+
     for idx, img_url in enumerate(data.images, start=1):
         img = ProductImage(
             product_id=product.id,
@@ -160,7 +171,7 @@ async def upsert_product(session: AsyncSession, data: MerchantProductIn) -> Prod
     return product
 
 async def build_search_doc(session: AsyncSession, product: Product) -> dict:
-    # primary image
+    # Consider only the primary image (position=0) for embedding
     img_q = (
         select(ProductImage)
         .where(ProductImage.product_id == product.id)

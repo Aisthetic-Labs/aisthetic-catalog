@@ -16,12 +16,30 @@ async def ingest_catalog_csv(
     merchant_id: UUID,
     file: UploadFile = File(...),
 ):
+    """
+    Ingest merchant catalog from CSV file.
+    The CSV is expected to have columns: id, title, description, category, sub_category, gender,
+    color, price, currency, brand, primary_image_url, image_urls_list, etc.
+    Adjust the mapping in the code as per your CSV structure.
+    1. Reads the CSV file.
+    2. Parses each row into MerchantProductIn objects.
+    3. Calls ingest_products to upsert into DB and index into search.
+    4. Returns count of ingested products.
+    """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV supported for now")
 
     content = await file.read()
     text = content.decode("utf-8")
     reader = csv.DictReader(text.splitlines())
+
+    # validate required columns
+    required_columns = ["id", "title", "price", "primary_image_url"]
+    for col in required_columns:
+        if col not in reader.fieldnames:
+            raise HTTPException(status_code=400, detail=f"Missing required column: {col}")
+
+
 
     products_in: list[MerchantProductIn] = []
     for row in reader:
@@ -30,14 +48,15 @@ async def ingest_catalog_csv(
             merchant_product_id=row["id"],
             title=row["title"],
             description=row.get("description", ""),
-            category=row.get("category", "shirt"),
+            category=row.get("category", "UNKNOWN"),
             sub_category=row.get("sub_category"),
             gender=row.get("gender"),
             color=row.get("color"),
             price=float(row["price"]),
             currency=row.get("currency", "INR"),
             brand=row.get("brand"),
-            images=[row["image_url"]],
+            primary_image=row.get("primary_image_url"),
+            images=list(row["image_urls_list"]),
         )
         products_in.append(p)
 
