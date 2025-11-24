@@ -44,6 +44,8 @@ class Product(TenantBase):
     care_instructions = Column(Text, nullable=True)
     status = Column(String, nullable=False, default="active")
 
+    metadata = Column(JSONB, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

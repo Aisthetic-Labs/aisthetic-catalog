@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -82,9 +82,14 @@ def build_full_text_for_embedding(product: Product) -> str:
     """
     Concatenate relevant fields into a single text blob for embeddings.
     """
+    desc = ""
+    if product.metadata:
+        meta_parts = [f"{k}: {v}" for k, v in product.metadata.items()]
+        meta_text = ". ".join(meta_parts)
+        desc = f"{product.description or ''}. {meta_text}"
     parts = [
         product.title,
-        product.description or "",
+        desc,
         f"Category: {product.category}/{product.sub_category or ''}",
         f"Color: {product.color_primary}",
         f"Fit: {product.fit}",

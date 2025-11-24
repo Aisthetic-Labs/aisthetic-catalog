@@ -22,6 +22,7 @@ class MerchantProductIn(BaseModel):
     images: List[HttpUrl]
     primary_image: HttpUrl
     variants: Optional[List[Dict]] = None
+    metadata: Optional[List[Dict]] = None
 
 
 class CatalogFilter(BaseModel):

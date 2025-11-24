@@ -57,6 +57,7 @@ async def ingest_catalog_csv(
             brand=row.get("brand"),
             primary_image=row.get("primary_image_url"),
             images=list(row["image_urls_list"]),
+            metadata=row.get("metadata", []),
         )
         products_in.append(p)
 
