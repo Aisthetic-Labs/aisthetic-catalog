@@ -84,8 +84,8 @@ def build_full_text_for_embedding(product: Product) -> str:
     Concatenate relevant fields into a single text blob for embeddings.
     """
     desc = ""
-    if product.metadata:
-        meta_parts = [f"{k}: {v}" for k, v in product.metadata.items()]
+    if product.meta_data:
+        meta_parts = [f"{k}: {v}" for k, v in product.meta_data.items()]
         meta_text = ". ".join(meta_parts)
         desc = f"{product.description or ''}. {meta_text}"
     parts = [
