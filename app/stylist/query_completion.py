@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel
 from app.llm.client import get_chat_client
 from app.core.config import settings
+from app.logger import logger
 
 
 class ChatTurn(BaseModel):
@@ -66,6 +67,7 @@ async def complete_stylist_query(
         "last_human_message": last_message,
         "product_context": product_context,
     }
+    logger.info(f"Qcompletion payload: {payload}")
 
     resp = await chat_client.chat.completions.create(
         model=settings.STYLIST_MODEL_NAME,
@@ -79,8 +81,8 @@ async def complete_stylist_query(
         response_format={"type": "json_object"},
         max_tokens=400,
     )
-
+    logger.info(f"Qcompletion response: {resp}")
     raw = resp.choices[0].message.content or "{}"
     data = json.loads(raw)
-
+    logger.info(f"Qcompletion data: {data}")
     return CompletedStylistQuery(**data)

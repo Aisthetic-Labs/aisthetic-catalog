@@ -1,5 +1,6 @@
 from typing import List
 from uuid import UUID
+import json
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,7 +111,6 @@ async def _stylist_llm_call(
     )
 
     content = resp.choices[0].message.content
-    import json
 
     parsed = json.loads(content)
 
@@ -149,15 +149,18 @@ async def handle_stylist_chat(
 ) -> StylistResponse:
     # 1) persona context
     persona_json = await build_persona_context(session, req.external_user_id)
+    logger.info(f"Built persona JSON: {persona_json}")
     # 2) detect intent
     intent = await detect_intent(req.message)
-    logger.debug(f"Detected stylist intent: {intent.value}")
+    logger.info(f"Detected stylist intent: {intent.value}")
 
     # 3) get or create user profile (for logging)
     user_profile = await get_or_create_user_profile(session, req.external_user_id)
+    logger.info(f"User profile ID: {user_profile.id}")
 
     # Convert history for query completion
     history_turns = [ChatTurn(role=h.role, message=h.message) for h in req.history]
+    logger.info(f"History turns: {history_turns}")
 
     # 4) routing by intent
     candidate_products = []
@@ -175,6 +178,7 @@ async def handle_stylist_chat(
                 filters=filters,
                 limit=4,
             )
+            logger.info(f"Product comparison search req: {search_req}")
             search_hits = await search_products(merchant_id, search_req)
             compare_ids = [UUID(h["product_id"]) for h in search_hits[:2]]
         else:
@@ -194,6 +198,7 @@ async def handle_stylist_chat(
             filters=filters,
             limit=20,
         )
+        logger.info(f"Occasion styling search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
         ids = [UUID(h["product_id"]) for h in hits]
         products = await _load_products_by_ids(session, ids)
@@ -208,6 +213,7 @@ async def handle_stylist_chat(
             filters=filters,
             limit=20,
         )
+        logger.info(f"Direct product search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
         ids = [UUID(h["product_id"]) for h in hits]
         products = await _load_products_by_ids(session, ids)

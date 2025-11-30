@@ -1,4 +1,5 @@
 import csv
+import json
 
 from app.core.tenant_db import get_tenant_sessionmaker
 from app.catalog.ingestion import ingest_products
@@ -56,8 +57,8 @@ async def ingest_catalog_csv(
             currency=row.get("currency", "INR"),
             brand=row.get("brand"),
             primary_image=row.get("primary_image_url"),
-            images=list(row["image_urls_list"]),
-            metadata=row.get("metadata", []),
+            images=[],
+            meta_data=json.loads(row["metadata"]),
         )
         products_in.append(p)
 

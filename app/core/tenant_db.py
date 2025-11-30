@@ -23,7 +23,7 @@ def get_tenant_engine(merchant_id: str) -> AsyncEngine:
             .filter(MerchantDBConnection.merchant_id == merchant_id)
             .one()
         )
-    print("DEBUG: Tenant DB Connection:", conn.db_host, conn.db_name, conn.db_user, conn.db_password)
+
     dsn = _build_dsn(conn)
     engine = create_async_engine(
         dsn,
