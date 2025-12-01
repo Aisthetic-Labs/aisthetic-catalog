@@ -21,6 +21,7 @@ class StylistChatRequest(BaseModel):
 class ChatTurn(BaseModel):
     role: str  # "user" or "assistant"
     message: str
+    recommended_product_ids: Optional[List[UUID]] = None
 
 
 class StylistResponse(BaseModel):

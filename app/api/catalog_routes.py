@@ -5,9 +5,16 @@ from app.core.tenant_db import get_tenant_sessionmaker
 from app.catalog.ingestion import ingest_products
 from uuid import UUID
 from fastapi import APIRouter, UploadFile, File, HTTPException
-# ...
-from app.catalog.dto import MerchantProductIn, CatalogSearchRequest, ImageSearchRequest
+from sqlalchemy import select
+
+from app.catalog.dto import (
+    MerchantProductIn,
+    CatalogSearchRequest,
+    ImageSearchRequest,
+    ProductDetailOut,
+)
 from app.catalog.search import search_products, search_products_by_image
+from app.catalog.models_tenant import Product, ProductImage, ProductVariant
 
 router = APIRouter(prefix="/merchants/{merchant_id}/catalog", tags=["catalog"])
 
@@ -100,3 +107,73 @@ async def search_catalog_by_image(
         # clean 501 for "not implemented"
         raise HTTPException(status_code=501, detail=str(e))
     return {"results": results}
+
+
+@router.get("/products/{product_id}", response_model=ProductDetailOut)
+async def get_product_detail(
+    merchant_id: UUID,
+    product_id: UUID,
+):
+    SessionLocal = get_tenant_sessionmaker(str(merchant_id))
+
+    async with SessionLocal() as session:
+        # Load main product
+        result = await session.execute(
+            select(Product).where(Product.id == product_id)
+        )
+        product = result.scalar_one_or_none()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # Load images ordered by position
+        img_result = await session.execute(
+            select(ProductImage)
+            .where(ProductImage.product_id == product.id)
+            .order_by(ProductImage.position.asc())
+        )
+        images = img_result.scalars().all()
+
+        primary_image_url = None
+        other_image_urls: list[str] = []
+        if images:
+            primary_image_url = images[0].image_url
+            other_image_urls = [img.image_url for img in images[1:]]
+
+        # Load variants
+        var_result = await session.execute(
+            select(ProductVariant).where(ProductVariant.product_id == product.id)
+        )
+        variant_rows = var_result.scalars().all()
+        variants_payload: list[dict] = []
+        for v in variant_rows:
+            payload = {
+                "size": v.size,
+                "sku": v.sku,
+                "in_stock": v.in_stock,
+            }
+            if v.extra:
+                payload.update(v.extra)
+            variants_payload.append(payload)
+
+        return ProductDetailOut(
+            product_id=str(product.id),
+            title=product.title,
+            description=product.description,
+            category=product.category,
+            sub_category=product.sub_category,
+            gender=product.gender,
+            color=product.color_primary,
+            secondary_colors=product.color_secondary,
+            fit=product.fit,
+            style_tags=product.style_tags,
+            occasion_tags=product.occasion_tags,
+            fabric=product.fabric,
+            price=float(product.price),
+            currency=product.currency,
+            brand=product.brand,
+            pattern=product.pattern,
+            primary_image=primary_image_url,
+            images=other_image_urls,
+            variants=variants_payload or None,
+            meta_data=product.meta_data,
+        )

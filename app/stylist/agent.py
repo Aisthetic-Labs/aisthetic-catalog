@@ -149,18 +149,21 @@ async def handle_stylist_chat(
 ) -> StylistResponse:
     # 1) persona context
     persona_json = await build_persona_context(session, req.external_user_id)
-    logger.info(f"Built persona JSON: {persona_json}")
+    # logger.info(f"Built persona JSON: {persona_json}")
     # 2) detect intent
     intent = await detect_intent(req.message)
     logger.info(f"Detected stylist intent: {intent.value}")
 
     # 3) get or create user profile (for logging)
     user_profile = await get_or_create_user_profile(session, req.external_user_id)
-    logger.info(f"User profile ID: {user_profile.id}")
+    # logger.info(f"User profile ID: {user_profile.id}")
 
     # Convert history for query completion
     history_turns = [ChatTurn(role=h.role, message=h.message) for h in req.history]
-    logger.info(f"History turns: {history_turns}")
+    # pretty print history for logging
+    for ht in history_turns:
+        logger.info(f"History turn - {ht.role}: {ht.recommended_product_ids}:{ht.message}")
+    logger.info(f"Converted {len(history_turns)} history turns for query completion.")
 
     # 4) routing by intent
     candidate_products = []

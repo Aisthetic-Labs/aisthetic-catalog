@@ -48,6 +48,29 @@ class ProductOut(BaseModel):
     image_url: Optional[HttpUrl] = None
 
 
+class ProductDetailOut(BaseModel):
+    product_id: str
+    title: str
+    description: Optional[str] = None
+    category: str
+    sub_category: Optional[str] = None
+    gender: Optional[str] = None
+    color: Optional[str] = None
+    secondary_colors: Optional[List[str]] = None
+    fit: Optional[str] = None
+    style_tags: Optional[List[str]] = None
+    occasion_tags: Optional[List[str]] = None
+    fabric: Optional[str] = None
+    price: float
+    currency: str
+    brand: Optional[str] = None
+    pattern: Optional[str] = None
+    primary_image: Optional[HttpUrl] = None
+    images: List[HttpUrl]
+    variants: Optional[List[Dict]] = None
+    meta_data: Optional[Dict] = None
+
+
 class ImageSearchRequest(BaseModel):
     image_url: HttpUrl
     filters: CatalogFilter = CatalogFilter()
