@@ -11,6 +11,7 @@ from app.catalog.search import search_products
 from app.core.config import settings
 from app.llm.client import get_chat_client
 from app.logger import logger
+from app.stylist.chat_context import get_chat_context_summarizer
 from app.stylist.dto import StylistChatRequest, StylistResponse, ChatTurn
 from app.stylist.intent_detection import detect_intent
 from app.stylist.intents import StylistIntent
@@ -61,9 +62,11 @@ async def _stylist_llm_call(
         user_message: str,
         candidate_products: List[dict],
         mode: str = "freeform",
+        chat_context: dict | None = None,
 ) -> StylistResponse:
     """
     mode: "freeform", "compare", "occasion"
+    chat_context: structured summary of recent conversation turns.
     """
 
     system_prompt = (
@@ -72,7 +75,9 @@ async def _stylist_llm_call(
         "Hard rules:\n"
         "- Answer in ONLY 1–2 sentences, max 40 words total.\n"
         "- You may use at most ONE emoji, and only if it feels natural.\n"
-        "- Respect the user's style preferences and constraints from persona.\n"
+        "- Respect the user's style preferences and constraints from persona but go outside if nothing is available in preferences or user asks you to.\n"
+        "- Use the chat_context summary to stay consistent with the ongoing conversation: reference conversation_window, recent_user_requests, recent_stylist_answers, and recent_recommended_product_ids to avoid repeats and follow up on past advice.\n"
+        "- If chat_context.current_user_message is provided, treat it as the authoritative latest ask and resolve ambiguities in favor of that field.\n"
         "- Recommend only from the candidate_products list. Never invent products.\n"
         "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n\n"
         "Output format (JSON ONLY, no extra text):\n"
@@ -90,6 +95,8 @@ async def _stylist_llm_call(
         "user_message": user_message,
         "candidate_products": candidate_products,
     }
+    if chat_context:
+        user_payload["chat_context"] = chat_context
 
     chat_client = get_chat_client()
     resp = await chat_client.chat.completions.create(
@@ -99,7 +106,8 @@ async def _stylist_llm_call(
             {
                 "role": "user",
                 "content": (
-                    "Here is the user persona, the current mode, the user message, and candidate products.\n"
+                    "Here are the user persona, chat_context summary (recent conversation window, recent requests/answers, recommendations, canonical user ask), the current mode, the user message, and candidate products.\n"
+                    "Use the chat_context fields to stay consistent with prior turns and avoid repeating recommendations.\n"
                     "Think through your reasoning silently, but DO NOT write the reasoning out.\n"
                     "Respond ONLY with a single JSON object matching the specified schema.\n\n"
                     f"INPUT:\n{user_payload}"
@@ -158,12 +166,26 @@ async def handle_stylist_chat(
     user_profile = await get_or_create_user_profile(session, req.external_user_id)
     # logger.info(f"User profile ID: {user_profile.id}")
 
+    chat_context_summarizer = get_chat_context_summarizer()
+    chat_context = await chat_context_summarizer.build_context(
+        merchant_id=merchant_id,
+        external_user_id=req.external_user_id,
+        incoming_history=req.history,
+        current_user_message=req.message,
+    )
+
     # Convert history for query completion
-    history_turns = [ChatTurn(role=h.role, message=h.message) for h in req.history]
+    history_turns_for_completion = [
+        ChatTurn(role=h.role, message=h.message) for h in req.history
+    ]
     # pretty print history for logging
-    for ht in history_turns:
-        logger.info(f"History turn - {ht.role}: {ht.recommended_product_ids}:{ht.message}")
-    logger.info(f"Converted {len(history_turns)} history turns for query completion.")
+    for ht in history_turns_for_completion:
+        logger.info(
+            f"History turn - {ht.role}: {ht.recommended_product_ids}:{ht.message}"
+        )
+    logger.info(
+        f"Converted {len(history_turns_for_completion)} history turns for query completion."
+    )
 
     # 4) routing by intent
     candidate_products = []
@@ -174,7 +196,7 @@ async def handle_stylist_chat(
         # If product IDs are passed, use them; else we might in future parse from message.
         if not req.compare_product_ids:
             # fallback: search using query completion
-            cq = await complete_stylist_query(history_turns, req.message)
+            cq = await complete_stylist_query(history_turns_for_completion, req.message)
             filters = _filters_from_completed_query(cq)
             search_req = CatalogSearchRequest(
                 query_text=cq.standalone_query or req.message,
@@ -192,7 +214,7 @@ async def handle_stylist_chat(
 
     elif intent == StylistIntent.OCCASION_STYLING:
         mode = "occasion"
-        cq = await complete_stylist_query(history_turns, req.message)
+        cq = await complete_stylist_query(history_turns_for_completion, req.message)
         filters = _filters_from_completed_query(cq)
         # strengthen the query with occasion
         query_text = cq.standalone_query or f"outfit for {cq.occasion or req.message}"
@@ -209,7 +231,7 @@ async def handle_stylist_chat(
 
     elif intent == StylistIntent.DIRECT_PRODUCT_SEARCH or intent == StylistIntent.GENERAL_STYLING:
         mode = "freeform"
-        cq = await complete_stylist_query(history_turns, req.message)
+        cq = await complete_stylist_query(history_turns_for_completion, req.message)
         filters = _filters_from_completed_query(cq)
         search_req = CatalogSearchRequest(
             query_text=cq.standalone_query or req.message,
@@ -239,17 +261,26 @@ async def handle_stylist_chat(
             context={"message": req.message},
         )
         await session.commit()
-        return StylistResponse(
+        resp = StylistResponse(
             answer=answer,
             recommended_product_ids=[],
             chosen_product_id=None,
             intent=intent,
         )
+        await chat_context_summarizer.append_exchange(
+            merchant_id=merchant_id,
+            external_user_id=req.external_user_id,
+            user_message=req.message,
+            stylist_response=resp,
+            intent=intent,
+            mode="profile_update",
+        )
+        return resp
 
     elif intent in (StylistIntent.SMALL_TALK, StylistIntent.HELP_ABOUT_AISTHETIC):
         # No catalog context required, let LLM answer directly with persona.
         chat_client = get_chat_client()
-        resp = await chat_client.chat.completions.create(
+        completions_resp = await chat_client.chat.completions.create(
             model=settings.STYLIST_MODEL_NAME,
             messages=[
                 {
@@ -264,7 +295,7 @@ async def handle_stylist_chat(
             ],
             max_tokens=400,
         )
-        answer = resp.choices[0].message.content or ""
+        answer = completions_resp.choices[0].message.content or ""
         await append_user_event(
             session,
             user_profile,
@@ -273,12 +304,21 @@ async def handle_stylist_chat(
             context={"message": req.message},
         )
         await session.commit()
-        return StylistResponse(
+        resp = StylistResponse(
             answer=answer,
             recommended_product_ids=[],
             chosen_product_id=None,
             intent=intent,
         )
+        await chat_context_summarizer.append_exchange(
+            merchant_id=merchant_id,
+            external_user_id=req.external_user_id,
+            user_message=req.message,
+            stylist_response=resp,
+            intent=intent,
+            mode=mode,
+        )
+        return resp
 
     elif intent == StylistIntent.TRY_ON_REQUEST:
         # Hand-off stub until Abhinav's try-on is wired
@@ -294,12 +334,21 @@ async def handle_stylist_chat(
             context={"message": req.message},
         )
         await session.commit()
-        return StylistResponse(
+        resp = StylistResponse(
             answer=answer,
             recommended_product_ids=[],
             chosen_product_id=None,
             intent=intent,
         )
+        await chat_context_summarizer.append_exchange(
+            merchant_id=merchant_id,
+            external_user_id=req.external_user_id,
+            user_message=req.message,
+            stylist_response=resp,
+            intent=intent,
+            mode="try_on_request",
+        )
+        return resp
 
     # 5) Call stylist LLM with persona + candidate products
     resp = await _stylist_llm_call(
@@ -307,6 +356,7 @@ async def handle_stylist_chat(
         user_message=req.message,
         candidate_products=candidate_products,
         mode=mode,
+        chat_context=chat_context,
     )
 
     # 6) log event
@@ -323,6 +373,15 @@ async def handle_stylist_chat(
         },
     )
     await session.commit()
+
+    await chat_context_summarizer.append_exchange(
+        merchant_id=merchant_id,
+        external_user_id=req.external_user_id,
+        user_message=req.message,
+        stylist_response=resp,
+        intent=intent,
+        mode=mode,
+    )
 
     # 7) return response with intent
     resp.intent = intent
