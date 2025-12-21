@@ -59,15 +59,17 @@ def _serialize_product_for_prompt(p: Product) -> dict:
 
 async def _stylist_llm_call(
         persona_json: str,
-        user_message: str,
         candidate_products: List[dict],
         mode: str = "freeform",
         chat_context: dict | None = None,
 ) -> StylistResponse:
     """
     mode: "freeform", "compare", "occasion"
-    chat_context: structured summary of recent conversation turns.
+    chat_context: structured summary of recent conversation turns including the latest user ask.
     """
+
+    if chat_context is None:
+        raise ValueError("chat_context is required to call the stylist LLM.")
 
     system_prompt = (
         "You are Aisthetic, a playful, hype but honest AI fashion stylist for Gen Z and young millennials.\n"
@@ -76,8 +78,8 @@ async def _stylist_llm_call(
         "- Answer in ONLY 1–2 sentences, max 40 words total.\n"
         "- You may use at most ONE emoji, and only if it feels natural.\n"
         "- Respect the user's style preferences and constraints from persona but go outside if nothing is available in preferences or user asks you to.\n"
-        "- Use the chat_context summary to stay consistent with the ongoing conversation: reference conversation_window, recent_user_requests, recent_stylist_answers, and recent_recommended_product_ids to avoid repeats and follow up on past advice.\n"
-        "- If chat_context.current_user_message is provided, treat it as the authoritative latest ask and resolve ambiguities in favor of that field.\n"
+        "- All conversational context (including the latest user ask) is provided via chat_context. Treat chat_context.current_user_message as the canonical ask, and if it is missing, infer intent from chat_context.conversation_window or recent_user_requests.\n"
+        "- Use chat_context.conversation_window, recent_user_requests, recent_stylist_answers, and recent_recommended_product_ids to stay consistent with the thread, follow up on past advice, and avoid repeating products.\n"
         "- Recommend only from the candidate_products list. Never invent products.\n"
         "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n\n"
         "Output format (JSON ONLY, no extra text):\n"
@@ -92,11 +94,9 @@ async def _stylist_llm_call(
     user_payload = {
         "persona": persona_json,
         "mode": mode,
-        "user_message": user_message,
         "candidate_products": candidate_products,
+        "chat_context": chat_context,
     }
-    if chat_context:
-        user_payload["chat_context"] = chat_context
 
     chat_client = get_chat_client()
     resp = await chat_client.chat.completions.create(
@@ -106,8 +106,8 @@ async def _stylist_llm_call(
             {
                 "role": "user",
                 "content": (
-                    "Here are the user persona, chat_context summary (recent conversation window, recent requests/answers, recommendations, canonical user ask), the current mode, the user message, and candidate products.\n"
-                    "Use the chat_context fields to stay consistent with prior turns and avoid repeating recommendations.\n"
+                    "Here are the user persona, the chat_context summary (conversation_window, recent requests/answers, recommendations, current_user_message), the current mode, and the candidate products.\n"
+                    "chat_context.current_user_message is the canonical latest user ask. Use the other chat_context fields to stay consistent with prior turns, resolve ambiguities, and avoid repeating recommendations.\n"
                     "Think through your reasoning silently, but DO NOT write the reasoning out.\n"
                     "Respond ONLY with a single JSON object matching the specified schema.\n\n"
                     f"INPUT:\n{user_payload}"
@@ -157,7 +157,7 @@ async def handle_stylist_chat(
 ) -> StylistResponse:
     # 1) persona context
     persona_json = await build_persona_context(session, req.external_user_id)
-    # logger.info(f"Built persona JSON: {persona_json}")
+    logger.info(f"Built persona JSON: {persona_json}")
     # 2) detect intent
     intent = await detect_intent(req.message)
     logger.info(f"Detected stylist intent: {intent.value}")
@@ -173,6 +173,8 @@ async def handle_stylist_chat(
         incoming_history=req.history,
         current_user_message=req.message,
     )
+
+    logger.info(f"Built chat context summary: {chat_context}")
 
     # Convert history for query completion
     history_turns_for_completion = [
@@ -223,10 +225,11 @@ async def handle_stylist_chat(
             filters=filters,
             limit=20,
         )
-        logger.info(f"Occasion styling search req: {search_req}")
+
         hits = await search_products(merchant_id, search_req)
         ids = [UUID(h["product_id"]) for h in hits]
         products = await _load_products_by_ids(session, ids)
+        logger.info(f"Occasion styling product ids: {ids}")
         candidate_products = [_serialize_product_for_prompt(p) for p in products]
 
     elif intent == StylistIntent.DIRECT_PRODUCT_SEARCH or intent == StylistIntent.GENERAL_STYLING:
@@ -353,7 +356,6 @@ async def handle_stylist_chat(
     # 5) Call stylist LLM with persona + candidate products
     resp = await _stylist_llm_call(
         persona_json=persona_json,
-        user_message=req.message,
         candidate_products=candidate_products,
         mode=mode,
         chat_context=chat_context,

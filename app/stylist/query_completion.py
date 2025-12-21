@@ -81,7 +81,7 @@ async def complete_stylist_query(
         response_format={"type": "json_object"},
         max_tokens=400,
     )
-    logger.info(f"Qcompletion response: {resp}")
+
     raw = resp.choices[0].message.content or "{}"
     data = json.loads(raw)
     logger.info(f"Qcompletion data: {data}")
