@@ -24,7 +24,12 @@ async def product_search_node(state: AgentState) -> dict:
     history = state["history"]
     compare_product_ids = state["compare_product_ids"]
     
-    logger.info(f"[AgentFlow] Entering product_search_node for intent: {intent.value}")
+    # Follow-up related fields
+    is_follow_up = state.get("is_follow_up", False)
+    refined_query = state.get("refined_query")
+    excluded_product_ids = state.get("excluded_product_ids", [])
+    
+    logger.info(f"[AgentFlow] Entering product_search_node for intent: {intent.value} (follow_up={is_follow_up})")
     
     candidate_products = []
     mode = "freeform"
@@ -33,7 +38,30 @@ async def product_search_node(state: AgentState) -> dict:
     history_turns = [ChatTurn(role=h.role, message=h.message) for h in history]
 
     # --- Routing by intent within search node ---
-    if intent == StylistIntent.PRODUCT_COMPARISON:
+    if intent == StylistIntent.FOLLOW_UP and refined_query:
+        # For follow-ups, we use the refined query from follow_up_node
+        filters = _filters_from_completed_query(refined_query)
+        search_req = CatalogSearchRequest(
+            query_text=refined_query.standalone_query or message,
+            filters=filters,
+            limit=20 + len(excluded_product_ids), # fetch more to allow exclusion
+        )
+        logger.info(f"[AgentFlow] Follow-up search req: {search_req}")
+        hits = await search_products(merchant_id, search_req)
+        
+        # Filter out already seen products
+        ids = []
+        excluded_strs = [str(eid) for eid in excluded_product_ids]
+        for h in hits:
+            if h["product_id"] not in excluded_strs:
+                ids.append(UUID(h["product_id"]))
+            if len(ids) >= 20: # maintain limit after exclusion
+                break
+        
+        products = await _load_products_by_ids(session, ids)
+        candidate_products = [_serialize_product_for_prompt(p) for p in products]
+
+    elif intent == StylistIntent.PRODUCT_COMPARISON:
         mode = "compare"
         if not compare_product_ids:
             # If no IDs provided, use LLM to extract a search query and filter

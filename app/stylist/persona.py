@@ -89,7 +89,7 @@ Price sensitivity: {pref.price_sensitivity or 'Unknown'}
             {
                 "role": "system",
                 "content": (
-                    "You are a fashion stylist persona summarizer. "
+                    "You are a fashion persona summarizer. "
                     "Given profile fields and recent events, produce a concise JSON "
                     "describing the user's fashion persona with keys like "
                     "preferred_colors, avoid_colors, preferred_fits, style_vibes, "

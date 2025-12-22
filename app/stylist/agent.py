@@ -21,7 +21,10 @@ async def handle_stylist_chat(
         "compare_product_ids": req.compare_product_ids,
         "session": session,
         "candidate_products": [],
-        "mode": "freeform"
+        "mode": "freeform",
+        "is_follow_up": False,
+        "excluded_product_ids": [],
+        "refined_query": None
     }
     
     # Execute the graph

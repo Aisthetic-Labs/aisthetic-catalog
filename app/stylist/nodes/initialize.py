@@ -12,7 +12,7 @@ async def initialize_node(state: AgentState) -> dict:
     Gathers basic context: persona summary, user profile, chat context, and intent.
     This runs at the start of every request.
     """
-    session = state["session"]
+    session = state["session"] # DB session
     external_user_id = state["external_user_id"]
     merchant_id = state["merchant_id"]
     

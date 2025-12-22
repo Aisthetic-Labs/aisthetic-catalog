@@ -4,6 +4,8 @@ import operator
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.stylist.dto import ChatTurn, StylistResponse
 from app.stylist.intents import StylistIntent
+from app.stylist.query_completion import CompletedStylistQuery
+
 
 class AgentState(TypedDict):
     """
@@ -26,6 +28,11 @@ class AgentState(TypedDict):
     candidate_products: Annotated[List[dict], operator.add]
     mode: str  # Current behavior mode (freeform, compare, occasion)
     user_profile: Optional[any]  # UserProfile model instance
+    
+    # --- Follow-up and Context Fields ---
+    is_follow_up: bool  # Whether current message is a follow-up
+    refined_query: Optional[CompletedStylistQuery]  # Merged query for follow-ups
+    excluded_product_ids: List[UUID]  # IDs to exclude from search results
     
     # --- Output Fields ---
     response: Optional[StylistResponse]  # Final response returned to API

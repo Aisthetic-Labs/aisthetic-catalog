@@ -1,0 +1,35 @@
+import json
+from app.logger import logger
+from app.stylist.dto import ChatTurn
+from app.stylist.query_completion import complete_stylist_query, CompletedStylistQuery
+from app.stylist.state import AgentState
+
+async def follow_up_node(state: AgentState) -> dict:
+    """
+    Handles follow-up questions by merging current message with conversation history.
+    Decides if it's a refinement (new filters) or a request for more products.
+    """
+    logger.info("[AgentFlow] Entering follow_up_node")
+    message = state["message"]
+    history = state["history"]
+    chat_context = state["chat_context"]
+    
+    # Extract excluded product IDs from chat context (previously recommended)
+    excluded_ids = []
+    if chat_context and "recent_recommended_product_ids" in chat_context:
+        excluded_ids = chat_context["recent_recommended_product_ids"]
+    
+    # Convert history for LLM
+    history_turns = [ChatTurn(role=h.role, message=h.message) for h in history]
+    
+    # Use complete_stylist_query to get a merged standalone query and filters
+    # This naturally handles "show more" or "in blue" by looking at history
+    refined_query = await complete_stylist_query(history_turns, message)
+    
+    logger.info(f"[AgentFlow] Refined follow-up query: {refined_query.standalone_query}")
+    
+    return {
+        "refined_query": refined_query,
+        "excluded_product_ids": excluded_ids,
+        "is_follow_up": True
+    }

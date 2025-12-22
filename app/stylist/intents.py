@@ -10,6 +10,7 @@ class StylistIntent(str, Enum):
     SMALL_TALK = "small_talk"
     HELP_ABOUT_AISTHETIC = "help_about_aisthetic"
     TRY_ON_REQUEST = "try_on_request"  # for future
+    FOLLOW_UP = "follow_up"
 
 
 STYLIST_INTENTS = [
@@ -83,6 +84,17 @@ STYLIST_INTENTS = [
             "Can I try this shirt on me?",
             "Show me how this would look on me.",
             "Do a virtual try-on for this dress.",
+        ],
+    },
+    {
+        "name": StylistIntent.FOLLOW_UP.value,
+        "description": "User is asking a follow-up question, refining a previous query, or asking for more options based on what was just shown.",
+        "examples": [
+            "Show me more like these.",
+            "Can you find these in blue?",
+            "Any cheaper options?",
+            "Show me some more please.",
+            "Make it more casual."
         ],
     },
 ]
