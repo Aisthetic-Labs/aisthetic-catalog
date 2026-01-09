@@ -3,6 +3,54 @@ from typing import List, Dict, Any
 from app.catalog.dto import CatalogSearchRequest, ImageSearchRequest
 from app.catalog.opensearch_client import get_opensearch_client, get_catalog_index_name
 from app.catalog.embeddings import embed_text, embed_image_from_url
+from app.logger import logger
+
+
+def _build_filter_clauses(filters, user_persona: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
+    clauses = []
+    
+    # 1) Category (from explicit filters)
+    if filters.category:
+        clauses.append({"term": {"category": filters.category}})
+
+    # 2) Color (explicit filter OR persona preferred, minus avoid)
+    final_colors = filters.color or []
+    if not final_colors and user_persona and user_persona.get("preferred_colors"):
+        # Respect ordering: preferred_colors is already ordered by user preference
+        final_colors = user_persona["preferred_colors"]
+    
+    if final_colors:
+        # If we have avoid_colors, remove them from the list if they were added via persona
+        avoid_colors = user_persona.get("avoid_colors", []) if user_persona else []
+        final_colors = [c for c in final_colors if c not in avoid_colors]
+        if final_colors:
+            clauses.append({"terms": {"color_primary": final_colors}})
+    elif user_persona and user_persona.get("avoid_colors"):
+        # Even if no preferred color, we should avoid specific ones
+        clauses.append({"bool": {"must_not": {"terms": {"color_primary": user_persona["avoid_colors"]}}}})
+
+    # 3) Gender
+    if filters.gender:
+        clauses.append({"term": {"gender": filters.gender}})
+
+    # 4) Price
+    if filters.price_min is not None or filters.price_max is not None:
+        price_range: Dict[str, Any] = {}
+        if filters.price_min is not None:
+            price_range["gte"] = filters.price_min
+        if filters.price_max is not None:
+            price_range["lte"] = filters.price_max
+        clauses.append({"range": {"price": price_range}})
+
+    # 5) Fits and Style Vibes (from persona)
+    if user_persona:
+        if user_persona.get("preferred_fits"):
+            clauses.append({"terms": {"fit": user_persona["preferred_fits"]}})
+        if user_persona.get("style_vibes"):
+            # assuming style_vibes might match tags
+            clauses.append({"terms": {"style_tags": user_persona["style_vibes"]}})
+
+    return clauses
 
 
 async def search_products(
@@ -16,28 +64,15 @@ async def search_products(
         return []
 
     # --- Build filter clauses ---
-    filter_clauses: List[Dict[str, Any]] = []
+    # Try with persona filters first
+    filter_clauses = _build_filter_clauses(req.filters, req.user_persona)
+    logger.info(f"[AgentFlow] Built filters: {filter_clauses}")
 
-    if req.filters.category:
-        filter_clauses.append({"term": {"category": req.filters.category}})
+    query_text = req.query_text
 
-    if req.filters.color:
-        filter_clauses.append({"terms": {"color_primary": req.filters.color}})
-
-    if req.filters.gender:
-        filter_clauses.append({"term": {"gender": req.filters.gender}})
-
-    if req.filters.price_min is not None or req.filters.price_max is not None:
-        price_range: Dict[str, Any] = {}
-        if req.filters.price_min is not None:
-            price_range["gte"] = req.filters.price_min
-        if req.filters.price_max is not None:
-            price_range["lte"] = req.filters.price_max
-        filter_clauses.append({"range": {"price": price_range}})
-
-    # --- Semantic + filtered search (Lucene knn with filter) ---
-    if req.query_text:
-        query_vector = await embed_text(req.query_text)
+    # --- Semantic + filtered search ---
+    if query_text:
+        query_vector = await embed_text(query_text)
 
         knn_field_obj: Dict[str, Any] = {
             "vector": query_vector,
@@ -59,8 +94,6 @@ async def search_products(
                 }
             },
         }
-
-    # --- Pure filter-only search (no query_text) ---
     else:
         body = {
             "size": req.limit,
@@ -73,6 +106,20 @@ async def search_products(
         }
 
     res = client.search(index=index_name, body=body)
+    
+    # Fallback: If no results with persona filters, try without persona filters
+    if res.get("hits", {}).get("total", {}).get("value", 0) == 0 and req.user_persona:
+        logger.info("[Search] No results with persona filters, falling back to basic filters")
+        basic_filters = _build_filter_clauses(req.filters, None)
+        if query_text:
+            knn_field_obj = {"vector": query_vector, "k": req.limit}
+            if basic_filters:
+                knn_field_obj["filter"] = {"bool": {"filter": basic_filters}}
+            body["query"] = {"knn": {"embedding": knn_field_obj}}
+        else:
+            body["query"] = {"bool": {"filter": basic_filters or [{"match_all": {}}]}}
+        res = client.search(index=index_name, body=body)
+
     hits = res.get("hits", {}).get("hits", [])
 
     results: List[Dict[str, Any]] = []

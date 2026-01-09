@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 from app.catalog.dto import CatalogSearchRequest
 from app.catalog.search import search_products
@@ -23,12 +24,20 @@ async def product_search_node(state: AgentState) -> dict:
     message = state["message"]
     history = state["history"]
     compare_product_ids = state["compare_product_ids"]
+    persona_json = state.get("persona_json")
     
     # Follow-up related fields
     is_follow_up = state.get("is_follow_up", False)
     refined_query = state.get("refined_query")
     excluded_product_ids = state.get("excluded_product_ids", [])
     
+    user_persona_dict = None
+    if persona_json:
+        try:
+            user_persona_dict = json.loads(persona_json)
+        except Exception:
+            logger.warning("[AgentFlow] Failed to parse persona_json for search")
+
     logger.info(f"[AgentFlow] Entering product_search_node for intent: {intent.value} (follow_up={is_follow_up})")
     
     candidate_products = []
@@ -45,6 +54,7 @@ async def product_search_node(state: AgentState) -> dict:
             query_text=refined_query.standalone_query or message,
             filters=filters,
             limit=20 + len(excluded_product_ids), # fetch more to allow exclusion
+            user_persona=user_persona_dict
         )
         logger.info(f"[AgentFlow] Follow-up search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
@@ -71,6 +81,7 @@ async def product_search_node(state: AgentState) -> dict:
                 query_text=cq.standalone_query or message,
                 filters=filters,
                 limit=4,
+                user_persona=user_persona_dict
             )
             logger.info(f"[AgentFlow] Product comparison search req: {search_req}")
             search_hits = await search_products(merchant_id, search_req)
@@ -91,6 +102,7 @@ async def product_search_node(state: AgentState) -> dict:
             query_text=query_text,
             filters=filters,
             limit=20,
+            user_persona=user_persona_dict
         )
         logger.info(f"[AgentFlow] Occasion styling search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
@@ -107,6 +119,7 @@ async def product_search_node(state: AgentState) -> dict:
             query_text=cq.standalone_query or message,
             filters=filters,
             limit=20,
+            user_persona=user_persona_dict
         )
         logger.info(f"[AgentFlow] Direct/General styling search req: {search_req}")
         hits = await search_products(merchant_id, search_req)

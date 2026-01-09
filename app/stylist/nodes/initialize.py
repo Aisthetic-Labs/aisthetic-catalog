@@ -20,6 +20,7 @@ async def initialize_node(state: AgentState) -> dict:
 
     # 1) Build/Load Persona Context
     persona_json = await build_persona_context(session, external_user_id)
+    logger.info("[AgentFlow] Built persona context: " + persona_json)
     # 2) Get/Create User Profile
     user_profile = await get_or_create_user_profile(session, external_user_id)
     
