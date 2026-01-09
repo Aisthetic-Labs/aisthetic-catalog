@@ -26,6 +26,7 @@ class AgentState(TypedDict):
     chat_context: Optional[dict]  # Structured conversation history & summary
     # Annotated with operator.add to allow multiple nodes to contribute products
     candidate_products: Annotated[List[dict], operator.add]
+    search_iteration: int  # Tracking number of search attempts
     mode: str  # Current behavior mode (freeform, compare, occasion)
     user_profile: Optional[any]  # UserProfile model instance
     

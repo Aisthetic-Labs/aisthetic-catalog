@@ -30,6 +30,7 @@ async def product_search_node(state: AgentState) -> dict:
     is_follow_up = state.get("is_follow_up", False)
     refined_query = state.get("refined_query")
     excluded_product_ids = state.get("excluded_product_ids", [])
+    search_iteration = state.get("search_iteration", 0)
     
     user_persona_dict = None
     if persona_json:
@@ -50,6 +51,13 @@ async def product_search_node(state: AgentState) -> dict:
     if intent == StylistIntent.FOLLOW_UP and refined_query:
         # For follow-ups, we use the refined query from follow_up_node
         filters = _filters_from_completed_query(refined_query)
+        
+        # Agentic Refinement: Broaden search if it's a re-attempt
+        if search_iteration > 0:
+            logger.info(f"[AgentFlow] Broadening search for follow-up (iteration {search_iteration})")
+            filters.color = [] # drop color constraint
+            filters.category = None # broaden category
+
         search_req = CatalogSearchRequest(
             query_text=refined_query.standalone_query or message,
             filters=filters,
@@ -77,6 +85,9 @@ async def product_search_node(state: AgentState) -> dict:
             # If no IDs provided, use LLM to extract a search query and filter
             cq = await complete_stylist_query(history_turns, message)
             filters = _filters_from_completed_query(cq)
+            if search_iteration > 0:
+                filters.color = []
+                filters.category = None
             search_req = CatalogSearchRequest(
                 query_text=cq.standalone_query or message,
                 filters=filters,
@@ -97,6 +108,9 @@ async def product_search_node(state: AgentState) -> dict:
         # Extract occasion and filters via LLM
         cq = await complete_stylist_query(history_turns, message)
         filters = _filters_from_completed_query(cq)
+        if search_iteration > 0:
+            filters.color = []
+            filters.category = None
         query_text = cq.standalone_query or f"outfit for {cq.occasion or message}"
         search_req = CatalogSearchRequest(
             query_text=query_text,
@@ -115,6 +129,9 @@ async def product_search_node(state: AgentState) -> dict:
         # Standard product discovery
         cq = await complete_stylist_query(history_turns, message)
         filters = _filters_from_completed_query(cq)
+        if search_iteration > 0:
+            filters.color = []
+            filters.category = None
         search_req = CatalogSearchRequest(
             query_text=cq.standalone_query or message,
             filters=filters,
@@ -128,4 +145,8 @@ async def product_search_node(state: AgentState) -> dict:
         candidate_products = [_serialize_product_for_prompt(p) for p in products]
 
     logger.info(f"[AgentFlow] Found {len(candidate_products)} candidate products")
-    return {"candidate_products": candidate_products, "mode": mode}
+    return {
+        "candidate_products": candidate_products,
+        "mode": mode,
+        "search_iteration": search_iteration + 1
+    }

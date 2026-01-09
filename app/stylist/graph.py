@@ -35,6 +35,20 @@ def route_intent(state: AgentState) -> str:
         logger.warning(f"[AgentFlow] Unknown intent {intent}, falling back to small_talk")
         return "small_talk" # fallback
 
+def route_search_result(state: AgentState) -> str:
+    """
+    Check if we found any products. If not, and we haven't reached the max
+    iterations, go back to product_search to refine.
+    """
+    products = state.get("candidate_products", [])
+    iteration = state.get("search_iteration", 0)
+    
+    if not products and iteration < 2:
+        logger.info(f"[AgentFlow] No products found. Retrying search (iteration {iteration})...")
+        return "product_search"
+    
+    return "generate_response"
+
 def create_stylist_graph():
     workflow = StateGraph(AgentState)
 
@@ -62,7 +76,16 @@ def create_stylist_graph():
     )
 
     workflow.add_edge("follow_up", "product_search")
-    workflow.add_edge("product_search", "generate_response")
+    
+    workflow.add_conditional_edges(
+        "product_search",
+        route_search_result,
+        {
+            "product_search": "product_search",
+            "generate_response": "generate_response"
+        }
+    )
+
     workflow.add_edge("generate_response", "finalize")
     workflow.add_edge("profile_update", "finalize")
     workflow.add_edge("small_talk", "finalize")

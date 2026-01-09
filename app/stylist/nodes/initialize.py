@@ -43,5 +43,6 @@ async def initialize_node(state: AgentState) -> dict:
         "chat_context": chat_context,
         "intent": intent,
         "candidate_products": [],
+        "search_iteration": 0,
         "mode": "freeform"
     }
