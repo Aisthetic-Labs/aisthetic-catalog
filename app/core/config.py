@@ -13,14 +13,14 @@ class Settings(BaseSettings):
     OPENSEARCH_PASSWORD: str | None = Field(default=None)
 
     # Embeddings (OpenAI)
-    EMBEDDING_MODEL_NAME: str = Field(default="text-embedding-3-small")
-    EMBEDDING_API_KEY: str = Field(default="")
+    TEXT_EMBEDDING_MODEL_NAME: str = Field(default="text-embedding-3-small")
+    TEXT_EMBEDDING_API_KEY: str = Field(default="")
 
     # Image embedding service URL (if any)
     REPLICATE_API_TOKEN: str = Field(default="")
     REPLICATE_IMAGE_EMBEDDING_MODEL: str = Field(default="openai/clip")
 
-    STYLIST_MODEL_NAME: str = "gpt-4.1-mini"
+    STYLIST_MODEL_NAME: str = Field(default="gpt-4.1-mini")
 
     # Redis / chat session caching
     REDIS_URL: str = Field(default="redis://localhost:6379/0")

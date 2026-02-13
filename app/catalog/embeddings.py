@@ -23,7 +23,7 @@ def get_oa_client() -> AsyncOpenAI:
     global _oa_client
     if _oa_client is None:
         _oa_client = AsyncOpenAI(
-            api_key=settings.EMBEDDING_API_KEY
+            api_key=settings.TEXT_EMBEDDING_API_KEY
         )
     return _oa_client
 
@@ -46,7 +46,7 @@ async def embed_text(text: str) -> List[float]:
 
     client = get_oa_client()
     resp = await client.embeddings.create(
-        model=settings.EMBEDDING_MODEL_NAME,
+        model=settings.TEXT_EMBEDDING_MODEL_NAME,
         input=text,
     )
     return resp.data[0].embedding

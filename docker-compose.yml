@@ -57,7 +57,7 @@ services:
       - CONTROL_DB_DSN=postgresql+psycopg2://airbender@db:5432/aisthetic_control
       - OPENSEARCH_HOST=http://opensearch:9200
       - REDIS_URL=redis://redis:6379/0
-      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - TEXT_EMBEDDING_API_KEY=${TEXT_EMBEDDING_API_KEY}
       - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
     depends_on:
       - db

@@ -9,6 +9,6 @@ def get_chat_client() -> AsyncOpenAI:
     if _chat_client is None:
 
         _chat_client = AsyncOpenAI(
-            api_key=settings.EMBEDDING_API_KEY
+            api_key=settings.TEXT_EMBEDDING_API_KEY
         )
     return _chat_client
