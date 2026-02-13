@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Index,
     String,
     DateTime,
     Numeric,
@@ -69,3 +70,23 @@ class ProductImage(TenantBase):
     image_url = Column(String, nullable=False)
     position = Column(Integer, nullable=False, default=1)
     alt_text = Column(String, nullable=True)
+
+
+class CsvUploadRow(TenantBase):
+    __tablename__ = "csv_upload_row"
+    __table_args__ = (
+        Index("ix_csv_upload_row_batch_id", "batch_id"),
+        Index("ix_csv_upload_row_status", "status"),
+        Index("ix_csv_upload_row_merchant_product_id", "merchant_product_id"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id = Column(UUID(as_uuid=True), nullable=False)
+    merchant_product_id = Column(String, nullable=False)
+    row_data = Column(JSONB, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    error_message = Column(Text, nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    processed_at = Column(DateTime(timezone=True), nullable=True)

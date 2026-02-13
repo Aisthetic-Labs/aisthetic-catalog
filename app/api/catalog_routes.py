@@ -1,20 +1,23 @@
 import csv
-import json
+import traceback
+import uuid as uuid_mod
+from typing import Optional
 
 from app.core.tenant_db import get_tenant_sessionmaker
-from app.catalog.ingestion import ingest_products
+from app.catalog.ingestion import ingest_products, parse_csv_row_to_dto
 from uuid import UUID
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Query, UploadFile, File, HTTPException
+from sqlalchemy import select, func, text
 
 from app.catalog.dto import (
-    MerchantProductIn,
     CatalogSearchRequest,
     ImageSearchRequest,
     ProductDetailOut,
+    BatchStatusOut,
 )
 from app.catalog.search import search_products, search_products_by_image
-from app.catalog.models_tenant import Product, ProductImage, ProductVariant
+from app.catalog.models_tenant import CsvUploadRow, Product, ProductImage, ProductVariant
+from app.logger import logger
 
 router = APIRouter(prefix="/merchants/{merchant_id}/catalog", tags=["catalog"])
 
@@ -24,61 +27,179 @@ async def ingest_catalog_csv(
     merchant_id: UUID,
     file: UploadFile = File(...),
 ):
-    """
-    Ingest merchant catalog from CSV file.
-    The CSV is expected to have columns: id, title, description, category, sub_category, gender,
-    color, price, currency, brand, primary_image_url, image_urls_list, etc.
-    Adjust the mapping in the code as per your CSV structure.
-    1. Reads the CSV file.
-    2. Parses each row into MerchantProductIn objects.
-    3. Calls ingest_products to upsert into DB and index into search.
-    4. Returns count of ingested products.
-    """
+    """Stage CSV rows for later processing. Returns immediately with a batch_id."""
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV supported for now")
 
     content = await file.read()
-    text = content.decode("utf-8")
-    reader = csv.DictReader(text.splitlines())
+    decoded = content.decode("utf-8")
+    reader = csv.DictReader(decoded.splitlines())
 
-    # validate required columns
     required_columns = ["id", "title", "price", "primary_image_url"]
     for col in required_columns:
         if col not in reader.fieldnames:
             raise HTTPException(status_code=400, detail=f"Missing required column: {col}")
 
+    batch_id = uuid_mod.uuid4()
+    rows_to_stage: list[CsvUploadRow] = []
 
-
-    products_in: list[MerchantProductIn] = []
     for row in reader:
-        # Minimal mapping – adjust column names to your CSV
-        p = MerchantProductIn(
-            merchant_product_id=row["id"],
-            title=row["title"],
-            description=row.get("description", ""),
-            category=row.get("category", "UNKNOWN"),
-            sub_category=row.get("sub_category"),
-            gender=row.get("gender"),
-            color=row.get("color"),
-            price=float(row["price"]),
-            currency=row.get("currency", "INR"),
-            brand=row.get("brand"),
-            primary_image=row.get("primary_image_url"),
-            images=[],
-            meta_data=json.loads(row["metadata"]),
+        rows_to_stage.append(
+            CsvUploadRow(
+                batch_id=batch_id,
+                merchant_product_id=row["id"],
+                row_data=dict(row),
+                status="pending",
+            )
         )
-        products_in.append(p)
 
+    if not rows_to_stage:
+        raise HTTPException(status_code=400, detail="CSV contains no data rows")
+
+    SessionLocal = get_tenant_sessionmaker(str(merchant_id))
+    async with SessionLocal() as session:
+        session.add_all(rows_to_stage)
+        await session.commit()
+
+    return {"status": "accepted", "batch_id": str(batch_id), "rows_staged": len(rows_to_stage)}
+
+
+@router.post("/ingest/process")
+async def process_staged_rows(
+    merchant_id: UUID,
+    limit: int = Query(default=50, ge=1, le=500),
+    batch_id: Optional[UUID] = Query(default=None),
+):
+    """Claim and process pending CsvUploadRows. Uses FOR UPDATE SKIP LOCKED for concurrency safety."""
+    SessionLocal = get_tenant_sessionmaker(str(merchant_id))
+
+    processed_count = 0
+    failed_count = 0
+
+    async with SessionLocal() as session:
+        # Build claim query
+        where_clause = "status = 'pending'"
+        params = {"lim": limit}
+        if batch_id:
+            where_clause += " AND batch_id = :bid"
+            params["bid"] = str(batch_id)
+
+        claim_sql = text(
+            f"SELECT id FROM csv_upload_row "
+            f"WHERE {where_clause} "
+            f"ORDER BY created_at "
+            f"LIMIT :lim "
+            f"FOR UPDATE SKIP LOCKED"
+        )
+        result = await session.execute(claim_sql, params)
+        claimed_ids = [r[0] for r in result.fetchall()]
+
+        if not claimed_ids:
+            return {"processed": 0, "failed": 0, "total_claimed": 0}
+
+        # Mark claimed rows as processing
+        await session.execute(
+            text(
+                "UPDATE csv_upload_row "
+                "SET status = 'processing', attempt_count = attempt_count + 1, updated_at = now() "
+                "WHERE id = ANY(:ids)"
+            ),
+            {"ids": claimed_ids},
+        )
+        await session.commit()
+
+    # Process each row individually for per-row error isolation
+    total = len(claimed_ids)
+    for idx, row_id in enumerate(claimed_ids, start=1):
+        async with SessionLocal() as session:
+            row_result = await session.execute(
+                select(CsvUploadRow).where(CsvUploadRow.id == row_id)
+            )
+            upload_row = row_result.scalar_one()
+
+            try:
+                logger.info(f"Processing {idx}/{total} (merchant={merchant_id})")
+                product_in = parse_csv_row_to_dto(upload_row.row_data)
+                await ingest_products(
+                    session=session,
+                    merchant_id=str(merchant_id),
+                    products=[product_in],
+                )
+                upload_row.status = "processed"
+                upload_row.processed_at = func.now()
+                processed_count += 1
+            except Exception as e:
+                logger.error(f"Failed processing row {row_id}: {e}")
+                upload_row.status = "failed"
+                upload_row.error_message = traceback.format_exc()
+                failed_count += 1
+
+            await session.commit()
+
+    return {"processed": processed_count, "failed": failed_count, "total_claimed": total}
+
+
+@router.get("/ingest/batch/{batch_id}/status", response_model=BatchStatusOut)
+async def get_batch_status(
+    merchant_id: UUID,
+    batch_id: UUID,
+):
+    """Return count breakdown by status for a given batch."""
     SessionLocal = get_tenant_sessionmaker(str(merchant_id))
 
     async with SessionLocal() as session:
-        count = await ingest_products(
-            session=session,
-            merchant_id=str(merchant_id),
-            products=products_in,
+        result = await session.execute(
+            select(
+                CsvUploadRow.status,
+                func.count().label("cnt"),
+            )
+            .where(CsvUploadRow.batch_id == batch_id)
+            .group_by(CsvUploadRow.status)
         )
+        counts = {row.status: row.cnt for row in result.fetchall()}
 
-    return {"status": "ok", "ingested": count}
+    if not counts:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    total = sum(counts.values())
+    return BatchStatusOut(
+        batch_id=str(batch_id),
+        total=total,
+        pending=counts.get("pending", 0),
+        processing=counts.get("processing", 0),
+        processed=counts.get("processed", 0),
+        failed=counts.get("failed", 0),
+    )
+
+
+@router.post("/ingest/retry-failed")
+async def retry_failed_rows(
+    merchant_id: UUID,
+    batch_id: Optional[UUID] = Query(default=None),
+    max_attempts: int = Query(default=3, ge=1),
+):
+    """Requeue failed rows back to pending for reprocessing."""
+    SessionLocal = get_tenant_sessionmaker(str(merchant_id))
+
+    async with SessionLocal() as session:
+        where_clause = "status = 'failed' AND attempt_count < :max_attempts"
+        params: dict = {"max_attempts": max_attempts}
+        if batch_id:
+            where_clause += " AND batch_id = :bid"
+            params["bid"] = str(batch_id)
+
+        result = await session.execute(
+            text(
+                f"UPDATE csv_upload_row "
+                f"SET status = 'pending', error_message = NULL, updated_at = now() "
+                f"WHERE {where_clause}"
+            ),
+            params,
+        )
+        requeued = result.rowcount
+        await session.commit()
+
+    return {"status": "ok", "requeued": requeued}
 
 
 @router.post("/search")

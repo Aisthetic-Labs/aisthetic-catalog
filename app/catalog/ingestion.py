@@ -1,4 +1,5 @@
-from typing import List
+import json
+from typing import Dict, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -12,6 +13,31 @@ from app.catalog.opensearch_client import (
 )
 from app.catalog.indexing_service import ensure_index_exists, index_product_to_opensearch
 from app.logger import logger
+
+
+def parse_csv_row_to_dto(row: Dict) -> MerchantProductIn:
+    """Convert a raw CSV row dict into a MerchantProductIn DTO."""
+    meta = row.get("metadata")
+    if isinstance(meta, str):
+        meta = json.loads(meta) if meta else None
+    elif not isinstance(meta, dict):
+        meta = None
+
+    return MerchantProductIn(
+        merchant_product_id=row["id"],
+        title=row["title"],
+        description=row.get("description", ""),
+        category=row.get("category", "UNKNOWN"),
+        sub_category=row.get("sub_category"),
+        gender=row.get("gender"),
+        color=row.get("color"),
+        price=float(row["price"]),
+        currency=row.get("currency", "INR"),
+        brand=row.get("brand"),
+        primary_image=row.get("primary_image_url"),
+        images=[],
+        meta_data=meta,
+    )
 
 
 async def upsert_product(session: AsyncSession, data: MerchantProductIn) -> Product:

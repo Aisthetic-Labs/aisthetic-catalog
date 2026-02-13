@@ -75,3 +75,12 @@ class ImageSearchRequest(BaseModel):
     image_url: HttpUrl
     filters: CatalogFilter = CatalogFilter()
     limit: int = 10
+
+
+class BatchStatusOut(BaseModel):
+    batch_id: str
+    total: int
+    pending: int
+    processing: int
+    processed: int
+    failed: int
