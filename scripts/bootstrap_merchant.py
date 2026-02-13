@@ -5,27 +5,34 @@ from app.control.models_control import Merchant, MerchantDBConnection, MerchantS
 def main():
     session = ControlSessionLocal()
     try:
-        m = Merchant(
-            name="Demo Merchant",
-            slug="demo-merchant",
-            status=MerchantStatus.active,
-            plan="starter"
-        )
-        session.add(m)
-        session.flush()
+        # Try to find existing merchant by slug first
+        m = session.query(Merchant).filter(Merchant.slug == "demo-merchant").first()
+        if not m:
+            m = Merchant(
+                name="Demo Merchant",
+                slug="demo-merchant",
+                status=MerchantStatus.active,
+                plan="starter"
+            )
+            session.add(m)
+            session.flush()
 
-        conn = MerchantDBConnection(
-            merchant_id=m.id,
-            db_type="postgres",
-            db_host="db",
-            db_port=5432,
-            db_name="aisthetic_merchant_1",
-            db_user="airbender",
-            db_password="password",
-        )
-        session.add(conn)
+        # Update or create connection
+        conn = session.query(MerchantDBConnection).filter(MerchantDBConnection.merchant_id == m.id).first()
+        if not conn:
+            conn = MerchantDBConnection(merchant_id=m.id)
+            session.add(conn)
+        
+        conn.db_type = "postgres"
+        conn.db_host = "db"
+        conn.db_port = 5432
+        conn.db_name = "aisthetic_merchant_1"
+        conn.db_user = "airbender"
+        conn.db_password = "password"
+        
         session.commit()
         print("Merchant ID:", m.id)
+        print("Merchant DB connection updated to 'db:5432'")
     finally:
         session.close()
 
