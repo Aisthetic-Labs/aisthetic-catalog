@@ -37,19 +37,6 @@ services:
     volumes:
       - opensearch_data:/usr/share/opensearch/data
 
-  dashboards:
-    image: opensearchproject/opensearch-dashboards:2.13.0
-    container_name: opensearch-dashboards
-    environment:
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
-      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
-    ports:
-      - "5601:5601"
-    depends_on:
-      - opensearch
-    networks:
-      - aisthetic-net
-
   app:
     build: .
     container_name: aisthetic-app
