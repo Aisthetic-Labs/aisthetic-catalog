@@ -6,7 +6,7 @@ from typing import Optional
 from app.core.tenant_db import get_tenant_sessionmaker
 from app.catalog.ingestion import ingest_products, parse_csv_row_to_dto
 from uuid import UUID
-from fastapi import APIRouter, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Query, UploadFile, File, HTTPException
 from sqlalchemy import select, func, text
 
 from app.catalog.dto import (
@@ -67,17 +67,14 @@ async def ingest_catalog_csv(
 @router.post("/ingest/process")
 async def process_staged_rows(
     merchant_id: UUID,
+    background_tasks: BackgroundTasks,
     limit: int = Query(default=50, ge=1, le=500),
     batch_id: Optional[UUID] = Query(default=None),
 ):
-    """Claim and process pending CsvUploadRows. Uses FOR UPDATE SKIP LOCKED for concurrency safety."""
+    """Claim pending rows and queue them for background processing. Returns immediately."""
     SessionLocal = get_tenant_sessionmaker(str(merchant_id))
 
-    processed_count = 0
-    failed_count = 0
-
     async with SessionLocal() as session:
-        # Build claim query
         where_clause = "status = 'pending'"
         params = {"lim": limit}
         if batch_id:
@@ -95,9 +92,8 @@ async def process_staged_rows(
         claimed_ids = [r[0] for r in result.fetchall()]
 
         if not claimed_ids:
-            return {"processed": 0, "failed": 0, "total_claimed": 0}
+            return {"status": "accepted", "queued": 0}
 
-        # Mark claimed rows as processing
         await session.execute(
             text(
                 "UPDATE csv_upload_row "
@@ -108,9 +104,17 @@ async def process_staged_rows(
         )
         await session.commit()
 
-    # Process each row individually for per-row error isolation
-    total = len(claimed_ids)
-    for idx, row_id in enumerate(claimed_ids, start=1):
+    background_tasks.add_task(_process_rows, str(merchant_id), claimed_ids)
+
+    return {"status": "accepted", "queued": len(claimed_ids)}
+
+
+async def _process_rows(merchant_id: str, row_ids: list) -> None:
+    """Background worker that processes claimed CsvUploadRows one by one."""
+    SessionLocal = get_tenant_sessionmaker(merchant_id)
+    total = len(row_ids)
+
+    for idx, row_id in enumerate(row_ids, start=1):
         async with SessionLocal() as session:
             row_result = await session.execute(
                 select(CsvUploadRow).where(CsvUploadRow.id == row_id)
@@ -122,21 +126,17 @@ async def process_staged_rows(
                 product_in = parse_csv_row_to_dto(upload_row.row_data)
                 await ingest_products(
                     session=session,
-                    merchant_id=str(merchant_id),
+                    merchant_id=merchant_id,
                     products=[product_in],
                 )
                 upload_row.status = "processed"
                 upload_row.processed_at = func.now()
-                processed_count += 1
             except Exception as e:
                 logger.error(f"Failed processing row {row_id}: {e}")
                 upload_row.status = "failed"
                 upload_row.error_message = traceback.format_exc()
-                failed_count += 1
 
             await session.commit()
-
-    return {"processed": processed_count, "failed": failed_count, "total_claimed": total}
 
 
 @router.get("/ingest/batch/{batch_id}/status", response_model=BatchStatusOut)
