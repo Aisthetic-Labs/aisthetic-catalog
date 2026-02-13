@@ -34,6 +34,8 @@ services:
       - "9200:9200"
     networks:
       - aisthetic-net
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
 
   dashboards:
     image: opensearchproject/opensearch-dashboards:2.13.0
@@ -72,3 +74,4 @@ networks:
 
 volumes:
   postgres_data:
+  opensearch_data:
