@@ -17,11 +17,11 @@ def main():
         conn = MerchantDBConnection(
             merchant_id=m.id,
             db_type="postgres",
-            db_host="localhost",
+            db_host="db",
             db_port=5432,
             db_name="aisthetic_merchant_1",
-            db_user="postgres",
-            db_password="postgres",
+            db_user="airbender",
+            db_password="password",
         )
         session.add(conn)
         session.commit()
