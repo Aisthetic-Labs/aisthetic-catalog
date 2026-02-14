@@ -50,12 +50,11 @@ class ChatContextSummarizer:
 
     async def build_context(
         self,
-        merchant_id: str,
-        external_user_id: str,
+        chat_session_id: str,
         incoming_history: Sequence[ChatTurn] | None = None,
         current_user_message: str | None = None,
     ) -> dict[str, Any]:
-        key = self._session_key(merchant_id, external_user_id)
+        key = self._session_key(chat_session_id)
         state = await self._get_state(key)
 
         normalized_client_history = (
@@ -75,14 +74,13 @@ class ChatContextSummarizer:
 
     async def append_exchange(
         self,
-        merchant_id: str,
-        external_user_id: str,
+        chat_session_id: str,
         user_message: str,
         stylist_response: StylistResponse,
         intent: StylistIntent | None = None,
         mode: str | None = None,
     ) -> None:
-        key = self._session_key(merchant_id, external_user_id)
+        key = self._session_key(chat_session_id)
         state = await self._get_state(key)
 
         user_entry: HistoryEntry = {
@@ -123,8 +121,8 @@ class ChatContextSummarizer:
         state.trim(self._history_limit)
         await self._persist(key, state)
 
-    async def reset_session(self, merchant_id: str, external_user_id: str) -> None:
-        key = self._session_key(merchant_id, external_user_id)
+    async def reset_session(self, chat_session_id: str) -> None:
+        key = self._session_key(chat_session_id)
         await self._redis.delete(key)
 
     async def _get_state(self, key: str) -> ChatSessionState:
@@ -139,8 +137,8 @@ class ChatContextSummarizer:
         )
 
     @staticmethod
-    def _session_key(merchant_id: str, external_user_id: str) -> str:
-        return f"stylist:chat:{merchant_id}:{external_user_id}"
+    def _session_key(chat_session_id: str) -> str:
+        return f"stylist:session:{chat_session_id}"
 
     def _render_context(self, history: Sequence[HistoryEntry]) -> dict[str, Any]:
         window = list(history[-self._window :])

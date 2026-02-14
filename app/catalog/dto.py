@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, model_validator
 from typing import List, Optional, Dict
 
 
@@ -32,7 +32,14 @@ class CatalogFilter(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     sizes: Optional[List[str]] = None
-    include_out_of_stock: bool = False
+    include_out_of_stock: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def _default_out_of_stock(self):
+        if self.include_out_of_stock is None:
+            from app.core.config import settings
+            self.include_out_of_stock = settings.INCLUDE_OUT_OF_STOCK
+        return self
 
 
 class CatalogSearchRequest(BaseModel):

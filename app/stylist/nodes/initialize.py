@@ -27,8 +27,7 @@ async def initialize_node(state: AgentState) -> dict:
     # 3) Build Chat Context Summary (recent history, summarized)
     chat_context_summarizer = get_chat_context_summarizer()
     chat_context = await chat_context_summarizer.build_context(
-        merchant_id=merchant_id,
-        external_user_id=external_user_id,
+        chat_session_id=state["chat_session_id"],
         incoming_history=state["history"],
         current_user_message=state["message"],
     )

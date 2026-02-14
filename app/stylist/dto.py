@@ -12,7 +12,8 @@ class QuickReply(BaseModel):
 
 class StylistChatRequest(BaseModel):
     external_user_id: str
-    message: str
+    message: Optional[str] = None
+    chat_session_id: Optional[str] = None
     history: List["ChatTurn"] = []   # forward-ref, defined below
     occasion: Optional[str] = None
     compare_product_ids: Optional[List[UUID]] = None
@@ -25,6 +26,7 @@ class ChatTurn(BaseModel):
 
 
 class StylistResponse(BaseModel):
+    chat_session_id: str = ""
     answer: str
     recommended_product_ids: List[UUID] = []
     chosen_product_id: Optional[UUID] = None

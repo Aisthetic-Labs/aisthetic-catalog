@@ -13,3 +13,4 @@ openai>=1.10.0
 replicate>=0.31.0
 redis>=5.0.1
 langgraph
+aioboto3>=12.0.0

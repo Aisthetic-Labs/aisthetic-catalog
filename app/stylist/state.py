@@ -1,4 +1,4 @@
-from typing import List, Optional, Annotated, TypedDict
+from typing import Any, List, Optional, Annotated, TypedDict
 from uuid import UUID
 import operator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,9 +16,11 @@ class AgentState(TypedDict):
     merchant_id: str
     external_user_id: str
     message: str
+    chat_session_id: str
+    session_data: Optional[dict[str, Any]]
     history: List[ChatTurn]
     compare_product_ids: Optional[List[UUID]]
-    
+
     # --- Internal Work State ---
     session: AsyncSession  # Active DB session
     persona_json: Optional[str]  # Serialized user persona context
