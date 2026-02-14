@@ -31,6 +31,8 @@ class CatalogFilter(BaseModel):
     gender: Optional[str] = None
     price_min: Optional[float] = None
     price_max: Optional[float] = None
+    sizes: Optional[List[str]] = None
+    include_out_of_stock: bool = False
 
 
 class CatalogSearchRequest(BaseModel):

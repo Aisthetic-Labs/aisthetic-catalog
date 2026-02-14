@@ -66,7 +66,7 @@ async def product_search_node(state: AgentState) -> dict:
         )
         logger.info(f"[AgentFlow] Follow-up search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
-        
+
         # Filter out already seen products
         ids = []
         excluded_strs = [str(eid) for eid in excluded_product_ids]
@@ -75,9 +75,10 @@ async def product_search_node(state: AgentState) -> dict:
                 ids.append(UUID(h["product_id"]))
             if len(ids) >= 20: # maintain limit after exclusion
                 break
-        
+
+        sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
         products = await _load_products_by_ids(session, ids)
-        candidate_products = [_serialize_product_for_prompt(p) for p in products]
+        candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     elif intent == StylistIntent.PRODUCT_COMPARISON:
         mode = "compare"
@@ -97,11 +98,13 @@ async def product_search_node(state: AgentState) -> dict:
             logger.info(f"[AgentFlow] Product comparison search req: {search_req}")
             search_hits = await search_products(merchant_id, search_req)
             compare_ids = [UUID(h["product_id"]) for h in search_hits[:2]]
+            sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in search_hits}
         else:
             compare_ids = compare_product_ids
+            sizes_by_id = {}
 
         products = await _load_products_by_ids(session, compare_ids)
-        candidate_products = [_serialize_product_for_prompt(p) for p in products]
+        candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     elif intent == StylistIntent.OCCASION_STYLING:
         mode = "occasion"
@@ -121,8 +124,9 @@ async def product_search_node(state: AgentState) -> dict:
         logger.info(f"[AgentFlow] Occasion styling search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
         ids = [UUID(h["product_id"]) for h in hits]
+        sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
         products = await _load_products_by_ids(session, ids)
-        candidate_products = [_serialize_product_for_prompt(p) for p in products]
+        candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     elif intent in (StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
         mode = "freeform"
@@ -141,8 +145,9 @@ async def product_search_node(state: AgentState) -> dict:
         logger.info(f"[AgentFlow] Direct/General styling search req: {search_req}")
         hits = await search_products(merchant_id, search_req)
         ids = [UUID(h["product_id"]) for h in hits]
+        sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
         products = await _load_products_by_ids(session, ids)
-        candidate_products = [_serialize_product_for_prompt(p) for p in products]
+        candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     logger.info(f"[AgentFlow] Found {len(candidate_products)} candidate products")
     return {

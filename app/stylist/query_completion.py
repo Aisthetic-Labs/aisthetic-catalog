@@ -21,6 +21,7 @@ class CompletedStylistQuery(BaseModel):
     occasion: Optional[str] = None
     price_min: Optional[float] = None
     price_max: Optional[float] = None
+    sizes: List[str] = []
 
 
 QUERY_COMPLETION_INSTRUCTIONS = """
@@ -40,6 +41,7 @@ Your job:
    - fit: e.g. "slim", "oversized", "regular"
    - occasion: e.g. "wedding", "office", "party", "vacation"
    - price_min / price_max: numeric INR if mentioned
+   - sizes: e.g. ["M", "L", "32", "UK8"] — clothing/shoe sizes mentioned
 
 Return ONLY a JSON object with keys:
 {
@@ -50,7 +52,8 @@ Return ONLY a JSON object with keys:
   "fit": "... or null",
   "occasion": "... or null",
   "price_min": null or number,
-  "price_max": null or number
+  "price_max": null or number,
+  "sizes": [...]
 }
 """
 

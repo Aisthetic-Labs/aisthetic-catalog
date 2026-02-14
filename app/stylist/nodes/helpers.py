@@ -18,8 +18,8 @@ async def _load_products_by_ids(
     return res.scalars().all()
 
 
-def _serialize_product_for_prompt(p: Product) -> dict:
-    return {
+def _serialize_product_for_prompt(p: Product, available_sizes: list[str] | None = None) -> dict:
+    result = {
         "id": str(p.id),
         "title": p.title,
         "description": p.description,
@@ -36,6 +36,9 @@ def _serialize_product_for_prompt(p: Product) -> dict:
         "brand": p.brand,
         "pattern": p.pattern,
     }
+    if available_sizes is not None:
+        result["available_sizes"] = available_sizes
+    return result
 
 
 def _filters_from_completed_query(cq: CompletedStylistQuery) -> CatalogFilter:
@@ -46,10 +49,13 @@ def _filters_from_completed_query(cq: CompletedStylistQuery) -> CatalogFilter:
     gender = cq.gender
     category = cq.garment_types[0] if cq.garment_types else None
 
+    sizes = cq.sizes if cq.sizes else None
+
     return CatalogFilter(
         category=category,
         color=[color] if color else None,
         gender=gender,
         price_min=price_min,
         price_max=price_max,
+        sizes=sizes,
     )

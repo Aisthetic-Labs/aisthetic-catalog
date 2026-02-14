@@ -92,8 +92,8 @@ Price sensitivity: {pref.price_sensitivity or 'Unknown'}
                     "You are a fashion persona summarizer. "
                     "Given profile fields and recent events, produce a concise JSON "
                     "describing the user's fashion persona with keys like "
-                    "preferred_colors, avoid_colors, preferred_fits, style_vibes, "
-                    "occasions, budget, and a short natural_language_summary."
+                    "preferred_sizes, preferred_colors, avoid_colors, preferred_fits, "
+                    "style_vibes, occasions, budget, and a short natural_language_summary."
                 ),
             },
             {

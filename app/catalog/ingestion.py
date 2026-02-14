@@ -155,12 +155,17 @@ async def ingest_products(
         img = img_res.scalar_one_or_none()
         primary_image_url = img.image_url if img else None
 
-        # This call could be moved to a background worker
+        # Get variants for size/stock indexing
+        variant_q = select(ProductVariant).where(ProductVariant.product_id == product.id)
+        variant_res = await session.execute(variant_q)
+        variants = variant_res.scalars().all()
+
         await index_product_to_opensearch(
             client=client,
             index_name=index_name,
             product=product,
-            primary_image_url=primary_image_url
+            primary_image_url=primary_image_url,
+            variants=variants,
         )
     logger.info(f"Indexed {len(ingested_products)} products into OpenSearch")
 

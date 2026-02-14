@@ -2,7 +2,7 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from opensearchpy import OpenSearch
 
-from app.catalog.models_tenant import Product, ProductImage
+from app.catalog.models_tenant import Product, ProductImage, ProductVariant
 from app.catalog.embeddings import embed_text, embed_image_from_url
 from app.catalog.opensearch_client import get_opensearch_client, get_catalog_index_name
 from app.logger import logger
@@ -39,6 +39,8 @@ def ensure_index_exists(
                 "pattern": {"type": "keyword"},
                 "status": {"type": "keyword"},
                 "image_url": {"type": "keyword"},
+                "available_sizes": {"type": "keyword"},
+                "has_stock": {"type": "boolean"},
                 "embedding": {
                     "type": "knn_vector",
                     "dimension": text_dim,
@@ -88,7 +90,8 @@ async def index_product_to_opensearch(
     client: OpenSearch,
     index_name: str,
     product: Product,
-    primary_image_url: str | None
+    primary_image_url: str | None,
+    variants: list[ProductVariant] | None = None,
 ):
     full_text = build_full_text_for_embedding(product)
     text_embedding = await embed_text(full_text)
@@ -119,6 +122,18 @@ async def index_product_to_opensearch(
         "image_url": primary_image_url,
         "embedding": text_embedding,
     }
+
+    # Derive size/stock fields from variants
+    if variants:
+        available_sizes = [v.size for v in variants if v.in_stock and v.size]
+        has_stock = any(v.in_stock for v in variants)
+    else:
+        # No variant data — assume product is available
+        available_sizes = []
+        has_stock = True
+
+    doc["available_sizes"] = available_sizes
+    doc["has_stock"] = has_stock
 
     if image_embedding is not None:
         doc["image_embedding"] = image_embedding

@@ -42,12 +42,22 @@ def _build_filter_clauses(filters, user_persona: Dict[str, Any] | None = None) -
             price_range["lte"] = filters.price_max
         clauses.append({"range": {"price": price_range}})
 
-    # 5) Fits and Style Vibes (from persona)
+    # 5) Stock filter — default to in-stock only
+    if not filters.include_out_of_stock:
+        clauses.append({"term": {"has_stock": True}})
+
+    # 6) Size filter (explicit or from persona)
+    size_filter = filters.sizes or []
+    if not size_filter and user_persona and user_persona.get("preferred_sizes"):
+        size_filter = user_persona["preferred_sizes"]
+    if size_filter:
+        clauses.append({"terms": {"available_sizes": size_filter}})
+
+    # 7) Fits and Style Vibes (from persona)
     if user_persona:
         if user_persona.get("preferred_fits"):
             clauses.append({"terms": {"fit": user_persona["preferred_fits"]}})
         if user_persona.get("style_vibes"):
-            # assuming style_vibes might match tags
             clauses.append({"terms": {"style_tags": user_persona["style_vibes"]}})
 
     return clauses
@@ -120,6 +130,20 @@ async def search_products(
             body["query"] = {"bool": {"filter": basic_filters or [{"match_all": {}}]}}
         res = client.search(index=index_name, body=body)
 
+    # Fallback 2: drop size filter if still no results
+    if res.get("hits", {}).get("total", {}).get("value", 0) == 0 and (req.filters.sizes or (req.user_persona and req.user_persona.get("preferred_sizes"))):
+        logger.info("[Search] No results with size filter, falling back without size constraint")
+        relaxed_filters = req.filters.model_copy(update={"sizes": None})
+        size_relaxed_clauses = _build_filter_clauses(relaxed_filters, None)
+        if query_text:
+            knn_field_obj = {"vector": query_vector, "k": req.limit}
+            if size_relaxed_clauses:
+                knn_field_obj["filter"] = {"bool": {"filter": size_relaxed_clauses}}
+            body["query"] = {"knn": {"embedding": knn_field_obj}}
+        else:
+            body["query"] = {"bool": {"filter": size_relaxed_clauses or [{"match_all": {}}]}}
+        res = client.search(index=index_name, body=body)
+
     hits = res.get("hits", {}).get("hits", [])
 
     results: List[Dict[str, Any]] = []
@@ -132,6 +156,7 @@ async def search_products(
                 "price": src["price"],
                 "currency": src["currency"],
                 "image_url": src.get("image_url"),
+                "available_sizes": src.get("available_sizes", []),
             }
         )
 
@@ -176,6 +201,12 @@ async def search_products_by_image(
             price_range["lte"] = req.filters.price_max
         filter_clauses.append({"range": {"price": price_range}})
 
+    if not req.filters.include_out_of_stock:
+        filter_clauses.append({"term": {"has_stock": True}})
+
+    if req.filters.sizes:
+        filter_clauses.append({"terms": {"available_sizes": req.filters.sizes}})
+
     knn_field_obj: Dict[str, Any] = {
         "vector": query_vector,
         "k": req.limit,
@@ -210,6 +241,7 @@ async def search_products_by_image(
                 "price": src["price"],
                 "currency": src["currency"],
                 "image_url": src.get("image_url"),
+                "available_sizes": src.get("available_sizes", []),
             }
         )
 
