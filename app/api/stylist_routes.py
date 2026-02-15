@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from uuid import UUID
 
 from app.core.tenant_db import get_tenant_sessionmaker
+from app.logger import logger
 from app.stylist.agent import handle_stylist_chat
 from app.stylist.dto import StylistResponse, QuickReply, StylistChatRequest
 from app.stylist.session_store import get_session_store
@@ -92,6 +93,7 @@ async def stylist_chat(
                 chat_session_data=chat_session_data,
             )
         except Exception as e:
+            logger.exception(f"Stylist chat failed for merchant={merchant_id} user={req.external_user_id}")
             raise HTTPException(status_code=500, detail=str(e))
 
     return resp
