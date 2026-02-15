@@ -22,7 +22,6 @@ async def product_search_node(state: AgentState) -> dict:
     db_session = state["db_session"]
     message = state["message"]
     chat_context = state["chat_context"]
-    compare_product_ids = state["compare_product_ids"]
     # Follow-up related fields
     is_follow_up = state.get("is_follow_up", False)
     refined_query = state.get("refined_query")
@@ -77,32 +76,6 @@ async def product_search_node(state: AgentState) -> dict:
 
         sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
         products = await _load_products_by_ids(db_session, ids)
-        candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
-
-    elif intent == StylistIntent.PRODUCT_COMPARISON:
-        mode = "compare"
-        if not compare_product_ids:
-            # If no IDs provided, use LLM to extract a search query and filter
-            cq = await complete_stylist_query(history_turns, message)
-            filters = _filters_from_completed_query(cq)
-            if search_iteration > 0:
-                filters.color = []
-                filters.category = None
-            search_req = CatalogSearchRequest(
-                query_text=cq.standalone_query or message,
-                filters=filters,
-                limit=4,
-                user_persona=user_persona_dict
-            )
-            logger.info(f"[AgentFlow] Product comparison search req: {search_req}")
-            search_hits = await search_products(merchant_id, search_req)
-            compare_ids = [UUID(h["product_id"]) for h in search_hits[:2]]
-            sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in search_hits}
-        else:
-            compare_ids = compare_product_ids
-            sizes_by_id = {}
-
-        products = await _load_products_by_ids(db_session, compare_ids)
         candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     elif intent == StylistIntent.OCCASION_STYLING:

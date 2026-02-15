@@ -18,8 +18,6 @@ class AgentState(TypedDict):
     message: str
     chat_session_id: str
     chat_session_data: Optional[dict[str, Any]]
-    compare_product_ids: Optional[List[UUID]]
-
     # --- Internal Work State ---
     db_session: AsyncSession  # Active DB session
     intent: Optional[StylistIntent]  # Detected intent (e.g., product_search)

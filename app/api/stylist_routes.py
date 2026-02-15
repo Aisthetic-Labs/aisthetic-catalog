@@ -27,10 +27,6 @@ WELCOME_QUICK_REPLIES = [
         payload={"suggested_intent": "occasion_styling"},
     ),
     QuickReply(
-        label="Help me choose between two items",
-        payload={"suggested_intent": "product_comparison"},
-    ),
-    QuickReply(
         label="Recommend shirts for me",
         payload={"suggested_intent": "direct_product_search", "query": "shirt"},
     ),

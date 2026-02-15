@@ -20,7 +20,7 @@ def route_intent(state: AgentState) -> str:
     """
     intent = state["intent"]
     logger.info(f"[AgentFlow] Routing based on intent: {intent.value}")
-    if intent in (StylistIntent.PRODUCT_COMPARISON, StylistIntent.OCCASION_STYLING,
+    if intent in (StylistIntent.OCCASION_STYLING,
                   StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
         return "product_search"
     elif intent == StylistIntent.PROFILE_UPDATE:

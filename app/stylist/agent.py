@@ -24,7 +24,6 @@ async def handle_stylist_chat(
         "message": req.message,
         "chat_session_id": chat_session_id,
         "chat_session_data": chat_session_data,
-        "compare_product_ids": req.compare_product_ids,
         "db_session": db_session,
         "candidate_products": [],
         "mode": "freeform",

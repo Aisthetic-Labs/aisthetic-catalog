@@ -2,7 +2,6 @@ from enum import Enum
 
 
 class StylistIntent(str, Enum):
-    PRODUCT_COMPARISON = "product_comparison"
     OCCASION_STYLING = "occasion_styling"
     DIRECT_PRODUCT_SEARCH = "direct_product_search"
     PROFILE_UPDATE = "profile_update"
@@ -14,15 +13,6 @@ class StylistIntent(str, Enum):
 
 
 STYLIST_INTENTS = [
-    {
-        "name": StylistIntent.PRODUCT_COMPARISON.value,
-        "description": "User is asking which of two or more garments/outfits will look better on them.",
-        "examples": [
-            "Which one looks better on me, the black slim shirt or the navy casual one?",
-            "Help me choose between these two outfits.",
-            "Is the first shirt better than the second one for my body type?"
-        ],
-    },
     {
         "name": StylistIntent.OCCASION_STYLING.value,
         "description": "User wants outfit ideas for a specific event or occasion.",

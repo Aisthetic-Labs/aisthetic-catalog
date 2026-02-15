@@ -15,7 +15,6 @@ class StylistChatRequest(BaseModel):
     message: Optional[str] = None
     chat_session_id: Optional[str] = None
     occasion: Optional[str] = None
-    compare_product_ids: Optional[List[UUID]] = None
 
 
 class ChatTurn(BaseModel):
