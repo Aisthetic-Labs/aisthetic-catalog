@@ -22,13 +22,6 @@ class Settings(BaseSettings):
 
     STYLIST_MODEL_NAME: str = Field(default="gpt-4.1-mini")
 
-    # DynamoDB (session cold store)
-    DYNAMODB_TABLE_NAME: str = "stylist_chat_sessions"
-    AWS_REGION: str = Field(default="ap-south-1")
-    AWS_ACCESS_KEY_ID: str | None = Field(default=None)
-    AWS_SECRET_ACCESS_KEY: str | None = Field(default=None)
-    AWS_ENDPOINT_URL: str | None = Field(default=None)
-
     # Catalog defaults
     INCLUDE_OUT_OF_STOCK: bool = Field(default=False)
 

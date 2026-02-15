@@ -1,5 +1,3 @@
-import asyncio
-
 from app.logger import logger
 from app.stylist.chat_context import get_chat_context_summarizer
 from app.stylist.intents import StylistIntent
@@ -10,7 +8,7 @@ from app.stylist.state import AgentState
 async def finalize_node(state: AgentState) -> dict:
     """
     The final step: persists user events, commits the transaction,
-    updates the chat session history in Redis, and syncs to DynamoDB.
+    updates the chat session history in Redis.
     """
     logger.info(f"[AgentFlow] Entering finalize_node")
     session = state["session"]
@@ -52,11 +50,10 @@ async def finalize_node(state: AgentState) -> dict:
         mode=mode,
     )
 
-    # 4) Fire-and-forget DynamoDB sync
+    # 4) Persist session to Redis
     store = get_session_store()
     session_data = state.get("session_data")
     if session_data is not None:
-        # Append the latest exchange to session_data history for DynamoDB
         session_data["history"].append({"role": "user", "message": message})
         assistant_entry = {"role": "assistant", "message": response.answer}
         if response.recommended_product_ids:
@@ -65,6 +62,5 @@ async def finalize_node(state: AgentState) -> dict:
             ]
         session_data["history"].append(assistant_entry)
         await store.save_session(chat_session_id, session_data)
-        asyncio.create_task(store.sync_to_dynamo(chat_session_id, session_data))
 
     return {}
