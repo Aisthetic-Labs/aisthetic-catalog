@@ -51,7 +51,7 @@ async def stylist_chat(
 
     # Case 1 & 2: no session_id → create new session
     if not has_session:
-        chat_session_id, chat_session_data = await store.create_session(
+        chat_session_id, _ = await store.create_session(
             merchant_id=str(merchant_id),
             external_user_id=req.external_user_id,
             welcome_message=WELCOME_MESSAGE,
@@ -69,8 +69,7 @@ async def stylist_chat(
     else:
         # Case 4: existing session
         chat_session_id = req.chat_session_id
-        chat_session_data = await store.get_session(chat_session_id)
-        if chat_session_data is None:
+        if await store.get_session(chat_session_id) is None:
             raise HTTPException(
                 status_code=404,
                 detail="Session not found or expired",
@@ -86,7 +85,6 @@ async def stylist_chat(
                 db_session=db_session,
                 req=req,
                 chat_session_id=chat_session_id,
-                chat_session_data=chat_session_data,
             )
         except Exception as e:
             logger.exception(f"Stylist chat failed for merchant={merchant_id} user={req.external_user_id}")

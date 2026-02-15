@@ -43,8 +43,6 @@ class ChatContextSummarizer:
     def __init__(self, redis_client: Redis | None = None):
         self._redis = redis_client or get_redis_client()
         self._history_limit = settings.CHAT_SESSION_STORAGE_TURNS
-        self._user_tail = settings.CHAT_SESSION_SUMMARY_USER_TURNS
-        self._assistant_tail = settings.CHAT_SESSION_SUMMARY_ASSISTANT_TURNS
         self._product_tail = settings.CHAT_SESSION_SUMMARY_PRODUCT_LIMIT
         self._window = min(12, self._history_limit)
 
@@ -128,17 +126,11 @@ class ChatContextSummarizer:
 
     def _render_context(self, history: Sequence[HistoryEntry]) -> dict[str, Any]:
         window = list(history[-self._window :])
-        recent_user = [
-            entry["message"] for entry in window if entry.get("role") == "user"
-        ]
-        recent_assistant = [
-            entry["message"] for entry in window if entry.get("role") == "assistant"
-        ]
+        summary_lines = [f"{e['role']}: {e['message']}" for e in window]
         recommended = self._collect_recent_recommendations(window)
         return {
             "conversation_window": window,
-            "recent_user_requests": recent_user[-self._user_tail :],
-            "recent_stylist_answers": recent_assistant[-self._assistant_tail :],
+            "conversation_summary": "\n".join(summary_lines),
             "recent_recommended_product_ids": recommended,
         }
 

@@ -24,8 +24,8 @@ async def generate_response_node(state: AgentState) -> dict:
         "- Answer in ONLY 1–2 sentences, max 40 words total.\n"
         "- You may use at most ONE emoji, and only if it feels natural.\n"
         "- Respect the user's style preferences and constraints from persona but go outside if nothing is available in preferences or user asks you to.\n"
-        "- All conversational context (including the latest user ask) is provided via chat_context. Treat chat_context.current_user_message as the canonical ask, and if it is missing, infer intent from chat_context.conversation_window or recent_user_requests.\n"
-        "- Use chat_context.conversation_window, recent_user_requests, recent_stylist_answers, and recent_recommended_product_ids to stay consistent with the thread, follow up on past advice, and avoid repeating products.\n"
+        "- All conversational context (including the latest user ask) is provided via chat_context. Treat chat_context.current_user_message as the canonical ask, and if it is missing, infer intent from chat_context.conversation_window or conversation_summary.\n"
+        "- Use chat_context.conversation_window, conversation_summary, and recent_recommended_product_ids to stay consistent with the thread, follow up on past advice, and avoid repeating products.\n"
         "- Recommend only from the candidate_products list. Never invent products.\n"
         "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n\n"
         "Output format (JSON ONLY, no extra text):\n"
@@ -52,8 +52,8 @@ async def generate_response_node(state: AgentState) -> dict:
             {
                 "role": "user",
                 "content": (
-                    "Here are the user persona, the chat_context summary (conversation_window, recent requests/answers, recommendations, current_user_message), the detected intent, and the candidate products.\n"
-                    "chat_context.current_user_message is the canonical latest user ask. Use the other chat_context fields to stay consistent with prior turns, resolve ambiguities, and avoid repeating recommendations.\n"
+                    "Here are the user persona, the chat_context summary (conversation_window, conversation_summary, recommendations, current_user_message), the detected intent, and the candidate products.\n"
+                    "chat_context.current_user_message is the canonical latest user ask. Use conversation_summary and conversation_window to stay consistent with prior turns, resolve ambiguities, and avoid repeating recommendations.\n"
                     "Think through your reasoning silently, but DO NOT write the reasoning out.\n"
                     "Respond ONLY with a single JSON object matching the specified schema.\n\n"
                     f"INPUT:\n{user_payload}"

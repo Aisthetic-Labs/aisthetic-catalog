@@ -1,5 +1,3 @@
-from typing import Any
-
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.stylist.dto import StylistChatRequest, StylistResponse
 from app.stylist.graph import stylist_agent_app
@@ -10,7 +8,6 @@ async def handle_stylist_chat(
         db_session: AsyncSession,
         req: StylistChatRequest,
         chat_session_id: str,
-        chat_session_data: dict[str, Any] | None = None,
 ) -> StylistResponse:
     """
     Main entrypoint for the Stylist Agent.
@@ -23,7 +20,6 @@ async def handle_stylist_chat(
         "external_user_id": req.external_user_id,
         "message": req.message,
         "chat_session_id": chat_session_id,
-        "chat_session_data": chat_session_data,
         "db_session": db_session,
         "is_follow_up": False,
         "excluded_product_ids": [],

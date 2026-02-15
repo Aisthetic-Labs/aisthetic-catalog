@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
     CHAT_SESSION_TTL_SECONDS: int = Field(default=6 * 60 * 60)
     CHAT_SESSION_STORAGE_TURNS: int = Field(default=40)
-    CHAT_SESSION_SUMMARY_USER_TURNS: int = Field(default=5)
-    CHAT_SESSION_SUMMARY_ASSISTANT_TURNS: int = Field(default=4)
     CHAT_SESSION_SUMMARY_PRODUCT_LIMIT: int = Field(default=6)
 
     class Config:

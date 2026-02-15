@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Annotated, TypedDict
+from typing import List, Optional, Annotated, TypedDict
 from uuid import UUID
 import operator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,6 @@ class AgentState(TypedDict):
     external_user_id: str
     message: str
     chat_session_id: str
-    chat_session_data: Optional[dict[str, Any]]
     # --- Internal Work State ---
     db_session: AsyncSession  # Active DB session
     intent: Optional[StylistIntent]  # Detected intent (e.g., product_search)
