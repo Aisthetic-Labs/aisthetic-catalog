@@ -3,8 +3,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog.dto import CatalogFilter
+from app.catalog.dto import CatalogFilter, CatalogSearchRequest
 from app.catalog.models_tenant import Product
+from app.catalog.search import search_products
+from app.logger import logger
 from app.stylist.query_completion import CompletedStylistQuery
 
 async def _load_products_by_ids(
@@ -59,3 +61,42 @@ def _filters_from_completed_query(cq: CompletedStylistQuery) -> CatalogFilter:
         price_max=price_max,
         sizes=sizes,
     )
+
+
+async def _search_and_load_products(
+    *,
+    merchant_id: str,
+    db_session: AsyncSession,
+    completed_query: CompletedStylistQuery,
+    query_text: str,
+    search_iteration: int,
+    user_persona: dict | None,
+    excluded_product_ids: list[UUID] | None = None,
+    limit: int = 20,
+) -> list[dict]:
+    filters = _filters_from_completed_query(completed_query)
+
+    if search_iteration > 0:
+        filters.color = []
+        filters.category = None
+
+    fetch_limit = limit + len(excluded_product_ids) if excluded_product_ids else limit
+
+    search_req = CatalogSearchRequest(
+        query_text=query_text,
+        filters=filters,
+        limit=fetch_limit,
+        user_persona=user_persona,
+    )
+    logger.info(f"[AgentFlow] Search request: {search_req}")
+    hits = await search_products(merchant_id, search_req)
+
+    if excluded_product_ids:
+        excluded_set = {str(eid) for eid in excluded_product_ids}
+        ids = [UUID(h["product_id"]) for h in hits if h["product_id"] not in excluded_set][:limit]
+    else:
+        ids = [UUID(h["product_id"]) for h in hits]
+
+    sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
+    products = await _load_products_by_ids(db_session, ids)
+    return [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
