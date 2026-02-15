@@ -1,6 +1,6 @@
 from app.logger import logger
 from app.stylist.dto import StylistResponse
-from app.stylist.persona import append_user_event
+from app.stylist.persona import update_user_preferences
 from app.stylist.state import AgentState
 
 async def profile_update_node(state: AgentState) -> dict:
@@ -9,23 +9,15 @@ async def profile_update_node(state: AgentState) -> dict:
     """
     logger.info(f"[AgentFlow] Entering profile_update_node")
     db_session = state["db_session"]
-    user_profile = state["user_profile"]
+    user_preferences = state["user_preferences"]
     message = state["message"]
-    
+
     answer = (
-        "Got it, I’ve updated your style preferences based on what you said. "
-        "I’ll keep that in mind for future recommendations."
-    )
-    # Log the update event
-    await append_user_event(
-        db_session,
-        user_profile,
-        event_type="profile_update",
-        product_id=None,
-        context={"message": message},
+        "Got it, I've updated your style preferences based on what you said. "
+        "I'll keep that in mind for future recommendations."
     )
     # Note: Commit happens later in finalize_node
-    
+
     response = StylistResponse(
         answer=answer,
         recommended_product_ids=[],

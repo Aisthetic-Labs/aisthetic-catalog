@@ -1,6 +1,6 @@
 # scripts/create_user_schema.py
 """
-Create UserProfile and UserEvent tables in a merchant's tenant DB.
+Create UserProfile and UserPreferences tables in a merchant's tenant DB.
 
 Usage:
     python -m scripts.create_user_schema --merchant-id <merchant_uuid>
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.tenant_db import get_tenant_engine
 
 # Import models so their tables are registered
-from app.stylist.models_user import UserProfile, UserEvent
+from app.stylist.models_user import UserProfile, UserPreferences
 
 
 async def create_user_schema_for_merchant(merchant_id: str) -> None:
@@ -31,10 +31,10 @@ async def create_user_schema_for_merchant(merchant_id: str) -> None:
     async with engine.begin() as conn:
         # Create each table individually, and safely
         await conn.run_sync(UserProfile.__table__.create, checkfirst=True)
-        await conn.run_sync(UserEvent.__table__.create, checkfirst=True)
+        await conn.run_sync(UserPreferences.__table__.create, checkfirst=True)
 
     await engine.dispose()
-    print(f"✅ Created/verified user_profile & user_event tables for merchant {merchant_id}")
+    print(f"✅ Created/verified user_profile & user_preferences tables for merchant {merchant_id}")
 
 
 def main():

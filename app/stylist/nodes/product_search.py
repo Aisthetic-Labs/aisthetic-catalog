@@ -23,15 +23,14 @@ async def product_search_node(state: AgentState) -> dict:
     message = state["message"]
     chat_context = state["chat_context"]
     compare_product_ids = state["compare_product_ids"]
-    persona_json = state.get("persona_json")
-    
     # Follow-up related fields
     is_follow_up = state.get("is_follow_up", False)
     refined_query = state.get("refined_query")
     excluded_product_ids = state.get("excluded_product_ids", [])
     search_iteration = state.get("search_iteration", 0)
-    
+
     user_persona_dict = None
+    persona_json = (state["user_preferences"].preferences or {}).get("persona_summary")
     if persona_json:
         try:
             user_persona_dict = json.loads(persona_json)

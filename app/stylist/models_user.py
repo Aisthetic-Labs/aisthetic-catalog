@@ -2,12 +2,9 @@ from sqlalchemy import (
     Column,
     String,
     DateTime,
-    Boolean,
-    Numeric,
-    Text,
     ForeignKey,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from app.catalog.models_tenant import TenantBase  # reuse same base
 import uuid
@@ -20,22 +17,9 @@ class UserProfile(TenantBase):
     # merchant's user id, e.g. from their auth system
     external_user_id = Column(String, nullable=False, unique=True)
 
-    # core attributes
+    # stable identity / physical attributes
     name = Column(String, nullable=True)
     gender = Column(String, nullable=True)  # "male"/"female"/"unisex"/etc
-    preferred_sizes = Column(ARRAY(String), nullable=True)  # ["M", "32", "UK8"]
-    body_type = Column(String, nullable=True)  # "athletic", "slim", etc
-
-    # preferences
-    liked_colors = Column(ARRAY(String), nullable=True)
-    disliked_colors = Column(ARRAY(String), nullable=True)
-    liked_fits = Column(ARRAY(String), nullable=True)       # ["oversized", "slim"]
-    liked_styles = Column(ARRAY(String), nullable=True)     # ["streetwear", "minimal"]
-    liked_occasions = Column(ARRAY(String), nullable=True)  # ["party", "wedding"]
-    price_sensitivity = Column(String, nullable=True)       # "budget", "mid", "premium"
-
-    # free-form summary we keep updating with LLM
-    persona_summary = Column(Text, nullable=True)
 
     meta = Column(JSONB, nullable=True)
 
@@ -43,20 +27,18 @@ class UserProfile(TenantBase):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
-class UserEvent(TenantBase):
+class UserPreferences(TenantBase):
     """
-    Generic event log for preference learning.
+    Mutable style preferences stored as flexible JSONB.
+    Keys include: body_type, preferred_sizes, liked_colors, disliked_colors,
+    liked_fits, liked_styles, liked_occasions, price_sensitivity, persona_summary.
     """
-    __tablename__ = "user_event"
+    __tablename__ = "user_preferences"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profile.id"), nullable=False)
-
-    event_type = Column(String, nullable=False)
-    # e.g. "view", "click", "add_to_cart", "purchase",
-    #      "like", "dislike", "stylist_question"
-
-    product_id = Column(UUID(as_uuid=True), ForeignKey("product.id"), nullable=True)
-    context = Column(JSONB, nullable=True)  # arbitrary extra data
-
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profile.id"), nullable=False, unique=True)
+    preferences = Column(JSONB, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+

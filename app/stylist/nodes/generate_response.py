@@ -12,7 +12,7 @@ async def generate_response_node(state: AgentState) -> dict:
     It takes persona, candidate products, and chat context into account.
     """
     logger.info(f"[AgentFlow] Entering generate_response_node")
-    persona_json = state["persona_json"]
+    persona_json = (state["user_preferences"].preferences or {}).get("persona_summary", "{}")
     candidate_products = state["candidate_products"]
     mode = state["mode"]
     chat_context = state["chat_context"]

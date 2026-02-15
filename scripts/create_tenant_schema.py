@@ -9,7 +9,7 @@ import argparse
 import asyncio
 from uuid import UUID
 
-from app.stylist.models_user import UserProfile, UserEvent  # ensure imported
+from app.stylist.models_user import UserProfile, UserPreferences  # ensure imported
 # They’ll get picked up via TenantBase.metadata.create_all
 
 from app.core.tenant_db import get_tenant_engine

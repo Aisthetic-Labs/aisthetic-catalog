@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.tenant_db import get_tenant_sessionmaker
 
 # Import your models
-from app.stylist.models_user import UserProfile, UserEvent
+from app.stylist.models_user import UserProfile, UserPreferences
 
 
 async def create_demo_user(merchant_id: str, external_user_id: str):
@@ -39,43 +39,34 @@ async def create_demo_user(merchant_id: str, external_user_id: str):
             print(f"User already exists: {user.id}")
             return user
 
-        # Create new user profile
+        # Create new user profile (stable identity fields only)
         user = UserProfile(
             external_user_id=external_user_id,
             name="Aisthetic Demo User",
             gender="male",
-            preferred_sizes=["M"],
-            body_type="athletic",
-
-            liked_colors=["black", "navy", "beige"],
-            disliked_colors=["neon green"],
-            liked_fits=["slim", "regular"],
-            liked_styles=["minimal", "smart casual"],
-            liked_occasions=["office", "party", "wedding"],
-            price_sensitivity="mid",
-
             meta={"profile_type": "demo"},
         )
 
         session.add(user)
         await session.flush()  # assigns UUID
 
-        # Add some synthetic user events
-        sample_events = [
-            ("view", None, {"desc": "Viewed catalog landing"}),
-            ("stylist_question", None, {"message": "Recommend something minimal"}),
-            ("view", None, {"desc": "Looked at shirts"}),
-            ("stylist_question", None, {"message": "Best shirt for office?"}),
-        ]
+        # Create preferences row with mutable style data
+        prefs = UserPreferences(
+            user_id=user.id,
+            preferences={
+                "body_type": "athletic",
+                "preferred_sizes": ["M"],
+                "liked_colors": ["black", "navy", "beige"],
+                "disliked_colors": ["neon green"],
+                "liked_fits": ["slim", "regular"],
+                "liked_styles": ["minimal", "smart casual"],
+                "liked_occasions": ["office", "party", "wedding"],
+                "price_sensitivity": "mid",
+            },
+        )
 
-        for event_type, pid, ctx in sample_events:
-            evt = UserEvent(
-                user_id=user.id,
-                event_type=event_type,
-                product_id=pid,
-                context=ctx,
-            )
-            session.add(evt)
+        session.add(prefs)
+        await session.flush()
 
         await session.commit()
         print(f"\n🎉 Demo user created successfully.\nUUID: {user.id}\n")
