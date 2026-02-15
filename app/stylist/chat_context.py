@@ -68,7 +68,6 @@ class ChatContextSummarizer:
         user_message: str,
         stylist_response: StylistResponse,
         intent: StylistIntent | None = None,
-        mode: str | None = None,
     ) -> None:
         key = self._session_key(chat_session_id)
         state = await self._get_state(key)
@@ -103,9 +102,6 @@ class ChatContextSummarizer:
                 if isinstance(final_intent, StylistIntent)
                 else str(final_intent)
             )
-
-        if mode:
-            assistant_entry["mode"] = mode
 
         state.history.extend([user_entry, assistant_entry])
         state.trim(self._history_limit)

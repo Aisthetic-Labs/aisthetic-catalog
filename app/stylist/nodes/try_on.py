@@ -19,4 +19,4 @@ async def try_on_node(state: AgentState) -> dict:
         chosen_product_id=None,
         intent=state["intent"],
     )
-    return {"response": response, "mode": "try_on_request"}
+    return {"response": response}

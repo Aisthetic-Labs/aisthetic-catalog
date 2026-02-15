@@ -39,8 +39,7 @@ async def product_search_node(state: AgentState) -> dict:
     logger.info(f"[AgentFlow] Entering product_search_node for intent: {intent.value} (follow_up={is_follow_up})")
     
     candidate_products = []
-    mode = "freeform"
-    
+
     # Build history turns from backend-managed conversation window
     conversation_window = chat_context.get("conversation_window", [])
     history_turns = [ChatTurn(role=h["role"], message=h["message"]) for h in conversation_window]
@@ -79,7 +78,6 @@ async def product_search_node(state: AgentState) -> dict:
         candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     elif intent == StylistIntent.OCCASION_STYLING:
-        mode = "occasion"
         # Extract occasion and filters via LLM
         cq = await complete_stylist_query(history_turns, message)
         filters = _filters_from_completed_query(cq)
@@ -101,7 +99,6 @@ async def product_search_node(state: AgentState) -> dict:
         candidate_products = [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
 
     elif intent in (StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
-        mode = "freeform"
         # Standard product discovery
         cq = await complete_stylist_query(history_turns, message)
         filters = _filters_from_completed_query(cq)
@@ -124,6 +121,5 @@ async def product_search_node(state: AgentState) -> dict:
     logger.info(f"[AgentFlow] Found {len(candidate_products)} candidate products")
     return {
         "candidate_products": candidate_products,
-        "mode": mode,
-        "search_iteration": search_iteration + 1
+        "search_iteration": search_iteration + 1,
     }

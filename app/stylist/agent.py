@@ -25,7 +25,6 @@ async def handle_stylist_chat(
         "chat_session_id": chat_session_id,
         "chat_session_data": chat_session_data,
         "db_session": db_session,
-        "mode": "freeform",
         "is_follow_up": False,
         "excluded_product_ids": [],
         "refined_query": None

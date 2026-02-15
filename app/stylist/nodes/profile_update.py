@@ -24,4 +24,4 @@ async def profile_update_node(state: AgentState) -> dict:
         chosen_product_id=None,
         intent=state["intent"],
     )
-    return {"response": response, "mode": "profile_update"}
+    return {"response": response}

@@ -14,7 +14,7 @@ async def generate_response_node(state: AgentState) -> dict:
     logger.info(f"[AgentFlow] Entering generate_response_node")
     persona_json = (state["user_preferences"].preferences or {}).get("persona_summary", "{}")
     candidate_products = state["candidate_products"]
-    mode = state["mode"]
+    intent = state["intent"]
     chat_context = state["chat_context"]
     
     system_prompt = (
@@ -39,7 +39,7 @@ async def generate_response_node(state: AgentState) -> dict:
 
     user_payload = {
         "persona": persona_json,
-        "mode": mode,
+        "intent": intent.value,
         "candidate_products": candidate_products,
         "chat_context": chat_context,
     }
@@ -52,7 +52,7 @@ async def generate_response_node(state: AgentState) -> dict:
             {
                 "role": "user",
                 "content": (
-                    "Here are the user persona, the chat_context summary (conversation_window, recent requests/answers, recommendations, current_user_message), the current mode, and the candidate products.\n"
+                    "Here are the user persona, the chat_context summary (conversation_window, recent requests/answers, recommendations, current_user_message), the detected intent, and the candidate products.\n"
                     "chat_context.current_user_message is the canonical latest user ask. Use the other chat_context fields to stay consistent with prior turns, resolve ambiguities, and avoid repeating recommendations.\n"
                     "Think through your reasoning silently, but DO NOT write the reasoning out.\n"
                     "Respond ONLY with a single JSON object matching the specified schema.\n\n"
@@ -75,6 +75,6 @@ async def generate_response_node(state: AgentState) -> dict:
         answer=parsed.get("answer", ""),
         recommended_product_ids=rec_ids,
         chosen_product_id=chosen_uuid,
-        intent=state["intent"]
+        intent=intent
     )
     return {"response": response}

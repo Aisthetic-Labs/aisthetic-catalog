@@ -12,7 +12,6 @@ async def finalize_node(state: AgentState) -> dict:
     db_session = state["db_session"]
     response = state["response"]
     intent = state["intent"]
-    mode = state["mode"]
     message = state["message"]
     chat_session_id = state["chat_session_id"]
 
@@ -26,7 +25,6 @@ async def finalize_node(state: AgentState) -> dict:
         user_message=message,
         stylist_response=response,
         intent=intent,
-        mode=mode,
     )
 
     # 3) Persist session to Redis
