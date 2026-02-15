@@ -63,6 +63,31 @@ def _build_filter_clauses(filters, user_persona: Dict[str, Any] | None = None) -
     return clauses
 
 
+def _build_search_body(
+    filter_clauses: List[Dict[str, Any]],
+    limit: int,
+    query_vector: List[float] | None = None,
+) -> Dict[str, Any]:
+    """Build an OpenSearch request body for either kNN or filter-only search."""
+    if query_vector is not None:
+        knn_field_obj: Dict[str, Any] = {"vector": query_vector, "k": limit}
+        if filter_clauses:
+            knn_field_obj["filter"] = {"bool": {"filter": filter_clauses}}
+        return {
+            "size": limit,
+            "query": {"knn": {"embedding": knn_field_obj}},
+        }
+    return {
+        "size": limit,
+        "sort": [{"_id": "desc"}],
+        "query": {"bool": {"filter": filter_clauses or [{"match_all": {}}]}},
+    }
+
+
+def _hit_count(res: Dict[str, Any]) -> int:
+    return res.get("hits", {}).get("total", {}).get("value", 0)
+
+
 async def search_products(
     merchant_id: str,
     req: CatalogSearchRequest,
@@ -73,75 +98,29 @@ async def search_products(
     if not client.indices.exists(index=index_name):
         return []
 
-    # --- Build filter clauses ---
+    query_text = req.query_text
+    query_vector = await embed_text(query_text) if query_text else None
+
     # Try with persona filters first
     filter_clauses = _build_filter_clauses(req.filters, req.user_persona)
-    logger.info(f"[AgentFlow] Built filters: {filter_clauses}")
-
-    query_text = req.query_text
-
-    # --- Semantic + filtered search ---
-    if query_text:
-        query_vector = await embed_text(query_text)
-
-        knn_field_obj: Dict[str, Any] = {
-            "vector": query_vector,
-            "k": req.limit,
-        }
-
-        if filter_clauses:
-            knn_field_obj["filter"] = {
-                "bool": {
-                    "filter": filter_clauses
-                }
-            }
-
-        body = {
-            "size": req.limit,
-            "query": {
-                "knn": {
-                    "embedding": knn_field_obj
-                }
-            },
-        }
-    else:
-        body = {
-            "size": req.limit,
-            "sort": [{"_id": "desc"}],
-            "query": {
-                "bool": {
-                    "filter": filter_clauses or [{"match_all": {}}],
-                }
-            },
-        }
-
+    logger.info(f"[Search] Built filters: {filter_clauses}")
+    body = _build_search_body(filter_clauses, req.limit, query_vector)
     res = client.search(index=index_name, body=body)
-    
-    # Fallback: If no results with persona filters, try without persona filters
-    if res.get("hits", {}).get("total", {}).get("value", 0) == 0 and req.user_persona:
+
+    # Fallback 1: drop persona filters
+    if _hit_count(res) == 0 and req.user_persona:
         logger.info("[Search] No results with persona filters, falling back to basic filters")
         basic_filters = _build_filter_clauses(req.filters, None)
-        if query_text:
-            knn_field_obj = {"vector": query_vector, "k": req.limit}
-            if basic_filters:
-                knn_field_obj["filter"] = {"bool": {"filter": basic_filters}}
-            body["query"] = {"knn": {"embedding": knn_field_obj}}
-        else:
-            body["query"] = {"bool": {"filter": basic_filters or [{"match_all": {}}]}}
+        body = _build_search_body(basic_filters, req.limit, query_vector)
         res = client.search(index=index_name, body=body)
 
-    # Fallback 2: drop size filter if still no results
-    if res.get("hits", {}).get("total", {}).get("value", 0) == 0 and (req.filters.sizes or (req.user_persona and req.user_persona.get("preferred_sizes"))):
+    # Fallback 2: also drop size filter
+    has_sizes = req.filters.sizes or (req.user_persona and req.user_persona.get("preferred_sizes"))
+    if _hit_count(res) == 0 and has_sizes:
         logger.info("[Search] No results with size filter, falling back without size constraint")
         relaxed_filters = req.filters.model_copy(update={"sizes": None})
         size_relaxed_clauses = _build_filter_clauses(relaxed_filters, None)
-        if query_text:
-            knn_field_obj = {"vector": query_vector, "k": req.limit}
-            if size_relaxed_clauses:
-                knn_field_obj["filter"] = {"bool": {"filter": size_relaxed_clauses}}
-            body["query"] = {"knn": {"embedding": knn_field_obj}}
-        else:
-            body["query"] = {"bool": {"filter": size_relaxed_clauses or [{"match_all": {}}]}}
+        body = _build_search_body(size_relaxed_clauses, req.limit, query_vector)
         res = client.search(index=index_name, body=body)
 
     hits = res.get("hits", {}).get("hits", [])
