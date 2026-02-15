@@ -8,7 +8,7 @@ async def try_on_node(state: AgentState) -> dict:
     Handoff for virtual try-on requests. (Future functionality)
     """
     logger.info(f"[AgentFlow] Entering try_on_node")
-    session = state["session"]
+    db_session = state["db_session"]
     user_profile = state["user_profile"]
     message = state["message"]
     
@@ -17,7 +17,7 @@ async def try_on_node(state: AgentState) -> dict:
         "For now, tell me which product you’re looking at and I’ll style it for you."
     )
     await append_user_event(
-        session,
+        db_session,
         user_profile,
         event_type="try_on_request",
         product_id=None,

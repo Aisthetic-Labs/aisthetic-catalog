@@ -8,7 +8,7 @@ async def profile_update_node(state: AgentState) -> dict:
     Handles user requests to update their style preferences.
     """
     logger.info(f"[AgentFlow] Entering profile_update_node")
-    session = state["session"]
+    db_session = state["db_session"]
     user_profile = state["user_profile"]
     message = state["message"]
     
@@ -18,7 +18,7 @@ async def profile_update_node(state: AgentState) -> dict:
     )
     # Log the update event
     await append_user_event(
-        session,
+        db_session,
         user_profile,
         event_type="profile_update",
         product_id=None,

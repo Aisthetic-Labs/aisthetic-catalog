@@ -7,10 +7,10 @@ from app.stylist.graph import stylist_agent_app
 
 async def handle_stylist_chat(
         merchant_id: str,
-        session: AsyncSession,
+        db_session: AsyncSession,
         req: StylistChatRequest,
         chat_session_id: str,
-        session_data: dict[str, Any] | None = None,
+        chat_session_data: dict[str, Any] | None = None,
 ) -> StylistResponse:
     """
     Main entrypoint for the Stylist Agent.
@@ -23,9 +23,9 @@ async def handle_stylist_chat(
         "external_user_id": req.external_user_id,
         "message": req.message,
         "chat_session_id": chat_session_id,
-        "session_data": session_data,
+        "chat_session_data": chat_session_data,
         "compare_product_ids": req.compare_product_ids,
-        "session": session,
+        "db_session": db_session,
         "candidate_products": [],
         "mode": "freeform",
         "is_follow_up": False,

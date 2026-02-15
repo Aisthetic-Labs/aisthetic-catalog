@@ -12,17 +12,17 @@ async def initialize_node(state: AgentState) -> dict:
     Gathers basic context: persona summary, user profile, chat context, and intent.
     This runs at the start of every request.
     """
-    session = state["session"] # DB session
+    db_session = state["db_session"]
     external_user_id = state["external_user_id"]
     merchant_id = state["merchant_id"]
     
     logger.info(f"[AgentFlow] Entering initialize_node for user={external_user_id}")
 
     # 1) Build/Load Persona Context
-    persona_json = await build_persona_context(session, external_user_id)
+    persona_json = await build_persona_context(db_session, external_user_id)
     logger.info("[AgentFlow] Built persona context: " + persona_json)
     # 2) Get/Create User Profile
-    user_profile = await get_or_create_user_profile(session, external_user_id)
+    user_profile = await get_or_create_user_profile(db_session, external_user_id)
     
     # 3) Build Chat Context Summary (recent history, summarized)
     chat_context_summarizer = get_chat_context_summarizer()

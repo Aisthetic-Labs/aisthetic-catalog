@@ -17,11 +17,11 @@ class AgentState(TypedDict):
     external_user_id: str
     message: str
     chat_session_id: str
-    session_data: Optional[dict[str, Any]]
+    chat_session_data: Optional[dict[str, Any]]
     compare_product_ids: Optional[List[UUID]]
 
     # --- Internal Work State ---
-    session: AsyncSession  # Active DB session
+    db_session: AsyncSession  # Active DB session
     persona_json: Optional[str]  # Serialized user persona context
     intent: Optional[StylistIntent]  # Detected intent (e.g., product_search)
     chat_context: Optional[dict]  # Structured conversation history & summary

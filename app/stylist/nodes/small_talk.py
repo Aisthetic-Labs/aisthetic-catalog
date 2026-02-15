@@ -11,7 +11,7 @@ async def small_talk_node(state: AgentState) -> dict:
     Handles non-catalog related queries (greetings, general help, personality).
     """
     logger.info(f"[AgentFlow] Entering small_talk_node")
-    session = state["session"]
+    db_session = state["db_session"]
     user_profile = state["user_profile"]
     message = state["message"]
     intent = state["intent"]
@@ -34,7 +34,7 @@ async def small_talk_node(state: AgentState) -> dict:
     )
     answer = completions_resp.choices[0].message.content or ""
     await append_user_event(
-        session,
+        db_session,
         user_profile,
         event_type="small_talk" if intent == StylistIntent.SMALL_TALK else "help",
         product_id=None,

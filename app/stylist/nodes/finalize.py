@@ -11,7 +11,7 @@ async def finalize_node(state: AgentState) -> dict:
     updates the chat session history in Redis.
     """
     logger.info(f"[AgentFlow] Entering finalize_node")
-    session = state["session"]
+    db_session = state["db_session"]
     user_profile = state["user_profile"]
     response = state["response"]
     intent = state["intent"]
@@ -24,7 +24,7 @@ async def finalize_node(state: AgentState) -> dict:
     if intent in (StylistIntent.PRODUCT_COMPARISON, StylistIntent.OCCASION_STYLING,
                   StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
         await append_user_event(
-            session,
+            db_session,
             user_profile,
             event_type="stylist_question",
             product_id=response.chosen_product_id,
@@ -38,7 +38,7 @@ async def finalize_node(state: AgentState) -> dict:
         )
 
     # 2) Commit all DB changes accumulated in previous nodes
-    await session.commit()
+    await db_session.commit()
 
     # 3) Update Chat Context in Redis
     chat_context_summarizer = get_chat_context_summarizer()
@@ -52,15 +52,15 @@ async def finalize_node(state: AgentState) -> dict:
 
     # 4) Persist session to Redis
     store = get_session_store()
-    session_data = state.get("session_data")
-    if session_data is not None:
-        session_data["history"].append({"role": "user", "message": message})
+    chat_session_data = state.get("chat_session_data")
+    if chat_session_data is not None:
+        chat_session_data["history"].append({"role": "user", "message": message})
         assistant_entry = {"role": "assistant", "message": response.answer}
         if response.recommended_product_ids:
             assistant_entry["recommended_product_ids"] = [
                 str(pid) for pid in response.recommended_product_ids
             ]
-        session_data["history"].append(assistant_entry)
-        await store.save_session(chat_session_id, session_data)
+        chat_session_data["history"].append(assistant_entry)
+        await store.save_session(chat_session_id, chat_session_data)
 
     return {}
