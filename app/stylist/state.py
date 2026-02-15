@@ -2,7 +2,7 @@ from typing import Any, List, Optional, Annotated, TypedDict
 from uuid import UUID
 import operator
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.stylist.dto import ChatTurn, StylistResponse
+from app.stylist.dto import StylistResponse
 from app.stylist.intents import StylistIntent
 from app.stylist.query_completion import CompletedStylistQuery
 
@@ -18,7 +18,6 @@ class AgentState(TypedDict):
     message: str
     chat_session_id: str
     session_data: Optional[dict[str, Any]]
-    history: List[ChatTurn]
     compare_product_ids: Optional[List[UUID]]
 
     # --- Internal Work State ---

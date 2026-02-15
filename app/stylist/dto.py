@@ -14,7 +14,6 @@ class StylistChatRequest(BaseModel):
     external_user_id: str
     message: Optional[str] = None
     chat_session_id: Optional[str] = None
-    history: List["ChatTurn"] = []   # forward-ref, defined below
     occasion: Optional[str] = None
     compare_product_ids: Optional[List[UUID]] = None
 

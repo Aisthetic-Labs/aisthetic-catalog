@@ -28,7 +28,6 @@ async def initialize_node(state: AgentState) -> dict:
     chat_context_summarizer = get_chat_context_summarizer()
     chat_context = await chat_context_summarizer.build_context(
         chat_session_id=state["chat_session_id"],
-        incoming_history=state["history"],
         current_user_message=state["message"],
     )
     

@@ -1,7 +1,6 @@
 import json
 from app.logger import logger
-from app.stylist.dto import ChatTurn
-from app.stylist.query_completion import complete_stylist_query, CompletedStylistQuery
+from app.stylist.query_completion import ChatTurn, complete_stylist_query, CompletedStylistQuery
 from app.stylist.state import AgentState
 
 async def follow_up_node(state: AgentState) -> dict:
@@ -11,16 +10,16 @@ async def follow_up_node(state: AgentState) -> dict:
     """
     logger.info("[AgentFlow] Entering follow_up_node")
     message = state["message"]
-    history = state["history"]
     chat_context = state["chat_context"]
-    
+
     # Extract excluded product IDs from chat context (previously recommended)
     excluded_ids = []
     if chat_context and "recent_recommended_product_ids" in chat_context:
         excluded_ids = chat_context["recent_recommended_product_ids"]
-    
-    # Convert history for LLM
-    history_turns = [ChatTurn(role=h.role, message=h.message) for h in history]
+
+    # Build history turns from backend-managed conversation window
+    conversation_window = chat_context.get("conversation_window", [])
+    history_turns = [ChatTurn(role=h["role"], message=h["message"]) for h in conversation_window]
     
     # Use complete_stylist_query to get a merged standalone query and filters
     # This naturally handles "show more" or "in blue" by looking at history

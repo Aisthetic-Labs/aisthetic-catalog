@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 from app.core.config import settings
 from app.core.redis import get_redis_client
 from app.logger import logger
-from app.stylist.dto import ChatTurn, StylistResponse
+from app.stylist.dto import StylistResponse
 from app.stylist.intents import StylistIntent
 
 HistoryEntry = dict[str, Any]
@@ -51,23 +51,13 @@ class ChatContextSummarizer:
     async def build_context(
         self,
         chat_session_id: str,
-        incoming_history: Sequence[ChatTurn] | None = None,
         current_user_message: str | None = None,
     ) -> dict[str, Any]:
         key = self._session_key(chat_session_id)
         state = await self._get_state(key)
 
-        normalized_client_history = (
-            [self._normalize_turn(turn) for turn in incoming_history or []]
-        )
-
-        if not state.history and normalized_client_history:
-            state.history = self._trimmed_copy(normalized_client_history)
-            await self._persist(key, state)
-
-        history_source = state.history or self._trimmed_copy(normalized_client_history)
-        summary = self._render_context(history_source)
-        summary["total_turn_count"] = len(history_source)
+        summary = self._render_context(state.history)
+        summary["total_turn_count"] = len(state.history)
         if current_user_message:
             summary["current_user_message"] = current_user_message
         return summary
@@ -172,24 +162,6 @@ class ChatContextSummarizer:
                 if len(collected) >= self._product_tail:
                     return collected
         return collected
-
-    @staticmethod
-    def _normalize_turn(turn: ChatTurn) -> HistoryEntry:
-        entry: HistoryEntry = {
-            "role": turn.role,
-            "message": turn.message,
-        }
-        recommended = getattr(turn, "recommended_product_ids", None) or []
-        if recommended:
-            entry["recommended_product_ids"] = [str(pid) for pid in recommended]
-        return entry
-
-    def _trimmed_copy(self, history: Sequence[HistoryEntry]) -> list[HistoryEntry]:
-        if not history:
-            return []
-        if len(history) <= self._history_limit:
-            return list(history)
-        return list(history)[-self._history_limit :]
 
 
 _summarizer_singleton: ChatContextSummarizer | None = None

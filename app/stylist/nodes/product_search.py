@@ -3,9 +3,8 @@ from uuid import UUID
 from app.catalog.dto import CatalogSearchRequest
 from app.catalog.search import search_products
 from app.logger import logger
-from app.stylist.dto import ChatTurn
 from app.stylist.intents import StylistIntent
-from app.stylist.query_completion import complete_stylist_query
+from app.stylist.query_completion import ChatTurn, complete_stylist_query
 from app.stylist.state import AgentState
 from app.stylist.nodes.helpers import (
     _load_products_by_ids,
@@ -22,7 +21,7 @@ async def product_search_node(state: AgentState) -> dict:
     merchant_id = state["merchant_id"]
     session = state["session"]
     message = state["message"]
-    history = state["history"]
+    chat_context = state["chat_context"]
     compare_product_ids = state["compare_product_ids"]
     persona_json = state.get("persona_json")
     
@@ -44,8 +43,9 @@ async def product_search_node(state: AgentState) -> dict:
     candidate_products = []
     mode = "freeform"
     
-    # Prepare history for query completion LLM
-    history_turns = [ChatTurn(role=h.role, message=h.message) for h in history]
+    # Build history turns from backend-managed conversation window
+    conversation_window = chat_context.get("conversation_window", [])
+    history_turns = [ChatTurn(role=h["role"], message=h["message"]) for h in conversation_window]
 
     # --- Routing by intent within search node ---
     if intent == StylistIntent.FOLLOW_UP and refined_query:
