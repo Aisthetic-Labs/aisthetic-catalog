@@ -8,20 +8,14 @@ from app.llm.client import get_chat_client
 from app.core.config import settings
 
 
-async def get_or_create_user_profile(
+async def find_user_profile(
     session: AsyncSession,
     external_user_id: str,
-) -> UserProfile:
+) -> UserProfile | None:
+    """Return the profile for *external_user_id*, or None if not found."""
     q = select(UserProfile).where(UserProfile.external_user_id == external_user_id)
     res = await session.execute(q)
-    profile = res.scalar_one_or_none()
-    if profile:
-        return profile
-
-    profile = UserProfile(external_user_id=external_user_id)
-    session.add(profile)
-    await session.flush()
-    return profile
+    return res.scalar_one_or_none()
 
 
 async def get_or_create_user_preferences(
@@ -57,7 +51,9 @@ async def summarize_persona(
 
     profile_text = (
         f"Name: {user.name or 'Unknown'}\n"
+        f"Date of Birth: {user.dob or 'Unknown'}\n"
         f"Gender: {user.gender or 'Unknown'}\n"
+        f"Fashion Taste: {user.fashion_taste or 'Unknown'}\n"
         f"Preferences: {json.dumps(prefs_for_prompt, default=str)}"
     )
 

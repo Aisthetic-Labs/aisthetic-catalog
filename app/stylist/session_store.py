@@ -16,6 +16,10 @@ def _redis_key(chat_session_id: str) -> str:
     return f"stylist:session:{chat_session_id}"
 
 
+def _onboarding_key(chat_session_id: str) -> str:
+    return f"stylist:onboarding:{chat_session_id}"
+
+
 class SessionStore:
 
     def __init__(self) -> None:
@@ -75,6 +79,29 @@ class SessionStore:
             json.dumps(data, ensure_ascii=False),
             ex=self._ttl,
         )
+
+    # ------------------------------------------------------------------
+    # Onboarding state (separate Redis key)
+    # ------------------------------------------------------------------
+
+    async def get_onboarding_state(self, chat_session_id: str) -> dict | None:
+        raw = await self._redis.get(_onboarding_key(chat_session_id))
+        if raw:
+            return json.loads(raw)
+        return None
+
+    async def set_onboarding_state(
+        self, chat_session_id: str, step: str, data: dict | None = None,
+    ) -> None:
+        payload = {"step": step, "data": data or {}}
+        await self._redis.set(
+            _onboarding_key(chat_session_id),
+            json.dumps(payload, ensure_ascii=False),
+            ex=self._ttl,
+        )
+
+    async def clear_onboarding_state(self, chat_session_id: str) -> None:
+        await self._redis.delete(_onboarding_key(chat_session_id))
 
 
 _store_singleton: SessionStore | None = None

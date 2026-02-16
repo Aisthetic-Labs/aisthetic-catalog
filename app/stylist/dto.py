@@ -11,7 +11,7 @@ class QuickReply(BaseModel):
 
 
 class StylistChatRequest(BaseModel):
-    external_user_id: str
+    external_user_id: Optional[str] = None
     message: Optional[str] = None
     chat_session_id: Optional[str] = None
     occasion: Optional[str] = None

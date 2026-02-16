@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Date,
     String,
     DateTime,
     ForeignKey,
@@ -19,7 +20,9 @@ class UserProfile(TenantBase):
 
     # stable identity / physical attributes
     name = Column(String, nullable=True)
+    dob = Column(Date, nullable=True)
     gender = Column(String, nullable=True)  # "male"/"female"/"unisex"/etc
+    fashion_taste = Column(String, nullable=True)
 
     meta = Column(JSONB, nullable=True)
 

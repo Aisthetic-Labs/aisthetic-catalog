@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.tenant_db import get_tenant_sessionmaker
 from app.stylist.persona import (
-    get_or_create_user_profile,
+    find_user_profile,
     get_or_create_user_preferences,
     summarize_persona,
 )
@@ -24,7 +24,10 @@ async def print_user_persona(merchant_id: str, external_user_id: str):
         SessionLocal = get_tenant_sessionmaker(merchant_id)
         async with SessionLocal() as session:
             print(f"--- Fetching Persona for Merchant: {merchant_id}, User: {external_user_id} ---")
-            user = await get_or_create_user_profile(session, external_user_id)
+            user = await find_user_profile(session, external_user_id)
+            if user is None:
+                print(f"No user profile found for external_user_id={external_user_id}")
+                return
             prefs = await get_or_create_user_preferences(session, user.id)
 
             cached = (prefs.preferences or {}).get("persona_summary")

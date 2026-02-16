@@ -5,6 +5,7 @@ from app.core.tenant_db import get_tenant_sessionmaker
 from app.logger import logger
 from app.stylist.agent import handle_stylist_chat
 from app.stylist.dto import StylistResponse, QuickReply, StylistChatRequest
+from app.stylist.persona import find_user_profile
 from app.stylist.session_store import get_session_store
 
 router = APIRouter(
@@ -32,6 +33,16 @@ WELCOME_QUICK_REPLIES = [
     ),
 ]
 
+AUTH_PROMPT = (
+    "Hey there! Looks like you're new here.\n\n"
+    "Would you like to log in to an existing account or register as a new user?"
+)
+
+AUTH_QUICK_REPLIES = [
+    QuickReply(label="Register", payload={"action": "register"}),
+    QuickReply(label="Login", payload={"action": "login"}),
+]
+
 
 @router.post("/chat", response_model=StylistResponse)
 async def stylist_chat(
@@ -51,19 +62,43 @@ async def stylist_chat(
 
     # Case 1 & 2: no session_id → create new session
     if not has_session:
-        chat_session_id, _ = await store.create_session(
-            merchant_id=str(merchant_id),
-            external_user_id=req.external_user_id,
-            welcome_message=WELCOME_MESSAGE,
-        )
+        # Check if user is registered
+        is_registered = False
+        if req.external_user_id:
+            SessionLocal = get_tenant_sessionmaker(str(merchant_id))
+            async with SessionLocal() as db_session:
+                profile = await find_user_profile(db_session, req.external_user_id)
+                is_registered = profile is not None
 
-        # Case 1: no message either → return welcome
-        if not has_message:
-            return StylistResponse(
-                chat_session_id=chat_session_id,
-                answer=WELCOME_MESSAGE,
-                quick_replies=WELCOME_QUICK_REPLIES,
+        if is_registered:
+            # Existing user → normal welcome flow
+            chat_session_id, _ = await store.create_session(
+                merchant_id=str(merchant_id),
+                external_user_id=req.external_user_id,
+                welcome_message=WELCOME_MESSAGE,
             )
+            if not has_message:
+                return StylistResponse(
+                    chat_session_id=chat_session_id,
+                    answer=WELCOME_MESSAGE,
+                    quick_replies=WELCOME_QUICK_REPLIES,
+                )
+        else:
+            # New user → auth prompt
+            chat_session_id, _ = await store.create_session(
+                merchant_id=str(merchant_id),
+                external_user_id=req.external_user_id or "",
+                welcome_message=AUTH_PROMPT,
+            )
+            await store.set_onboarding_state(
+                chat_session_id, step="awaiting_auth_choice",
+            )
+            if not has_message:
+                return StylistResponse(
+                    chat_session_id=chat_session_id,
+                    answer=AUTH_PROMPT,
+                    quick_replies=AUTH_QUICK_REPLIES,
+                )
 
         # Case 2: has message → fall through to agent processing
     else:

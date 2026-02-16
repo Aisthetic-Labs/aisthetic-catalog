@@ -11,6 +11,7 @@ from app.stylist.nodes import (
     try_on_node,
     finalize_node,
     follow_up_node,
+    onboarding_node,
 )
 
 def route_intent(state: AgentState) -> str:
@@ -20,6 +21,8 @@ def route_intent(state: AgentState) -> str:
     """
     intent = state["intent"]
     logger.info(f"[AgentFlow] Routing based on intent: {intent.value}")
+    if intent == StylistIntent.ONBOARDING:
+        return "onboarding"
     if intent in (StylistIntent.OCCASION_STYLING,
                   StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
         return "product_search"
@@ -42,11 +45,11 @@ def route_search_result(state: AgentState) -> str:
     """
     products = state.get("candidate_products", [])
     iteration = state.get("search_iteration", 0)
-    
+
     if not products and iteration < 2:
         logger.info(f"[AgentFlow] No products found. Retrying search (iteration {iteration})...")
         return "product_search"
-    
+
     return "generate_response"
 
 def create_stylist_graph():
@@ -60,6 +63,7 @@ def create_stylist_graph():
     workflow.add_node("small_talk", small_talk_node)
     workflow.add_node("try_on", try_on_node)
     workflow.add_node("finalize", finalize_node)
+    workflow.add_node("onboarding", onboarding_node)
 
     workflow.set_entry_point("initialize")
 
@@ -71,12 +75,13 @@ def create_stylist_graph():
             "profile_update": "profile_update",
             "small_talk": "small_talk",
             "try_on": "try_on",
-            "follow_up": "follow_up"
+            "follow_up": "follow_up",
+            "onboarding": "onboarding",
         }
     )
 
     workflow.add_edge("follow_up", "product_search")
-    
+
     workflow.add_conditional_edges(
         "product_search",
         route_search_result,
@@ -90,6 +95,7 @@ def create_stylist_graph():
     workflow.add_edge("profile_update", "finalize")
     workflow.add_edge("small_talk", "finalize")
     workflow.add_edge("try_on", "finalize")
+    workflow.add_edge("onboarding", "finalize")
     workflow.add_edge("finalize", END)
 
     return workflow.compile()

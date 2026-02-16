@@ -1,44 +1,70 @@
 from app.logger import logger
 from app.stylist.chat_context import get_chat_context_summarizer
 from app.stylist.intent_detection import detect_intent
+from app.stylist.intents import StylistIntent
 from app.stylist.persona import (
-    get_or_create_user_profile,
+    find_user_profile,
     get_or_create_user_preferences,
     summarize_persona,
 )
+from app.stylist.session_store import get_session_store
 from app.stylist.state import AgentState
 
 async def initialize_node(state: AgentState) -> dict:
     """
     Gathers basic context: persona summary, user profile, chat context, and intent.
     This runs at the start of every request.
+
+    If the user is mid-onboarding (or unregistered), short-circuits to ONBOARDING
+    intent so the graph routes to onboarding_node.
     """
     db_session = state["db_session"]
     external_user_id = state["external_user_id"]
-    merchant_id = state["merchant_id"]
-    
+    chat_session_id = state["chat_session_id"]
+
     logger.info(f"[AgentFlow] Entering initialize_node for user={external_user_id}")
 
-    # 1) Get/Create User Profile + Preferences
-    user_profile = await get_or_create_user_profile(db_session, external_user_id)
+    # 0) Check for active onboarding flow
+    store = get_session_store()
+    onboarding = await store.get_onboarding_state(chat_session_id)
+    if onboarding:
+        logger.info(f"[AgentFlow] Active onboarding (step={onboarding['step']}), skipping normal init")
+        return {
+            "intent": StylistIntent.ONBOARDING,
+            "search_iteration": 0,
+        }
+
+    # 1) Look up user profile (do NOT auto-create)
+    user_profile = await find_user_profile(db_session, external_user_id) if external_user_id else None
+
+    if user_profile is None:
+        # Unregistered user hitting the agent (e.g. Case 2: first call with message)
+        logger.info("[AgentFlow] User not found, routing to onboarding")
+        await store.set_onboarding_state(chat_session_id, step="awaiting_auth_choice")
+        return {
+            "intent": StylistIntent.ONBOARDING,
+            "search_iteration": 0,
+        }
+
+    # 2) Get/Create Preferences
     user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
 
-    # 2) Ensure persona summary exists in preferences
+    # 3) Ensure persona summary exists in preferences
     if not (user_preferences.preferences or {}).get("persona_summary"):
         await summarize_persona(db_session, user_profile, user_preferences)
     logger.info("[AgentFlow] Persona context ready")
 
-    # 3) Build Chat Context Summary (recent history, summarized)
+    # 4) Build Chat Context Summary (recent history, summarized)
     chat_context_summarizer = get_chat_context_summarizer()
     chat_context = await chat_context_summarizer.build_context(
-        chat_session_id=state["chat_session_id"],
+        chat_session_id=chat_session_id,
         current_user_message=state["message"],
     )
-    
-    # 4) Detect User Intent (e.g., search, styling, small talk)
+
+    # 5) Detect User Intent (e.g., search, styling, small talk)
     intent = await detect_intent(state["message"])
     logger.info(f"[AgentFlow] Detected intent: {intent.value}")
-    
+
     return {
         "user_preferences": user_preferences,
         "chat_context": chat_context,

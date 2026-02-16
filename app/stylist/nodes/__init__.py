@@ -6,6 +6,7 @@ from .small_talk import small_talk_node
 from .try_on import try_on_node
 from .finalize import finalize_node
 from .follow_up import follow_up_node
+from .onboarding import onboarding_node
 
 __all__ = [
     "initialize_node",
@@ -16,4 +17,5 @@ __all__ = [
     "try_on_node",
     "finalize_node",
     "follow_up_node",
+    "onboarding_node",
 ]

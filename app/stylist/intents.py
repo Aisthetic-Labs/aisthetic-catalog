@@ -10,6 +10,7 @@ class StylistIntent(str, Enum):
     HELP_ABOUT_AISTHETIC = "help_about_aisthetic"
     TRY_ON_REQUEST = "try_on_request"  # for future
     FOLLOW_UP = "follow_up"
+    ONBOARDING = "onboarding"  # internal only, never LLM-detected
 
 
 STYLIST_INTENTS = [
