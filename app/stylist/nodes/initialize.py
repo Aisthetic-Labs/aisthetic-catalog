@@ -8,6 +8,7 @@ from app.stylist.persona import (
     summarize_persona,
 )
 from app.stylist.session_store import get_session_store
+from app.stylist.shortlist_service import get_shortlist_service
 from app.stylist.state import AgentState
 
 async def initialize_node(state: AgentState) -> dict:
@@ -32,6 +33,7 @@ async def initialize_node(state: AgentState) -> dict:
         return {
             "intent": StylistIntent.ONBOARDING,
             "search_iteration": 0,
+            "shortlist_product_ids": [],
         }
 
     # 1) Look up user profile (do NOT auto-create)
@@ -44,6 +46,7 @@ async def initialize_node(state: AgentState) -> dict:
         return {
             "intent": StylistIntent.ONBOARDING,
             "search_iteration": 0,
+            "shortlist_product_ids": [],
         }
 
     # 2) Get/Create Preferences
@@ -61,7 +64,11 @@ async def initialize_node(state: AgentState) -> dict:
         current_user_message=state["message"],
     )
 
-    # 5) Detect User Intent (e.g., search, styling, small talk)
+    # 5) Load shortlist from Redis
+    shortlist_service = get_shortlist_service()
+    shortlist_product_ids = await shortlist_service.get_all(chat_session_id)
+
+    # 6) Detect User Intent (e.g., search, styling, small talk)
     intent = await detect_intent(state["message"])
     logger.info(f"[AgentFlow] Detected intent: {intent.value}")
 
@@ -70,4 +77,5 @@ async def initialize_node(state: AgentState) -> dict:
         "chat_context": chat_context,
         "intent": intent,
         "search_iteration": 0,
+        "shortlist_product_ids": shortlist_product_ids,
     }

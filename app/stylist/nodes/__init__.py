@@ -8,6 +8,7 @@ from .finalize import finalize_node
 from .follow_up import follow_up_node
 from .onboarding import onboarding_node
 from .occasion_styling import occasion_styling_node
+from .shortlist import shortlist_node
 
 __all__ = [
     "initialize_node",
@@ -20,4 +21,5 @@ __all__ = [
     "follow_up_node",
     "onboarding_node",
     "occasion_styling_node",
+    "shortlist_node",
 ]

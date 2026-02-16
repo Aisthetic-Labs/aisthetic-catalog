@@ -9,6 +9,7 @@ class StylistIntent(str, Enum):
     SMALL_TALK = "small_talk"
     HELP_ABOUT_AISTHETIC = "help_about_aisthetic"
     TRY_ON_REQUEST = "try_on_request"  # for future
+    SHORTLIST_MANAGEMENT = "shortlist_management"
     FOLLOW_UP = "follow_up"
     ONBOARDING = "onboarding"  # internal only, never LLM-detected
 
@@ -75,6 +76,19 @@ STYLIST_INTENTS = [
             "Can I try this shirt on me?",
             "Show me how this would look on me.",
             "Do a virtual try-on for this dress.",
+        ],
+    },
+    {
+        "name": StylistIntent.SHORTLIST_MANAGEMENT.value,
+        "description": "User wants to save, remove, view, or clear items from their shortlist.",
+        "examples": [
+            "Add the second one to my shortlist",
+            "Save the red kurta",
+            "Remove the first item",
+            "Show my shortlist",
+            "Clear my saved items",
+            "Shortlist all of these",
+            "I like the first and third one, save them",
         ],
     },
     {

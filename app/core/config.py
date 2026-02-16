@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     CHAT_SESSION_STORAGE_TURNS: int = Field(default=40)
     CHAT_SESSION_SUMMARY_PRODUCT_LIMIT: int = Field(default=6)
     CHAT_SESSION_CONTEXT_WINDOW: int = Field(default=20)
+    SHORTLIST_MAX_SIZE: int = Field(default=10)
 
     class Config:
         env_file = ".env"

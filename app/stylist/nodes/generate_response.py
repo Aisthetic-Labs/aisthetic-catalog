@@ -5,6 +5,7 @@ from app.llm.client import get_chat_client
 from app.logger import logger
 from app.stylist.dto import StylistResponse
 from app.stylist.state import AgentState
+from .helpers import _load_products_by_ids, _serialize_product_for_prompt
 
 async def generate_response_node(state: AgentState) -> dict:
     """
@@ -16,7 +17,19 @@ async def generate_response_node(state: AgentState) -> dict:
     candidate_products = state["candidate_products"]
     intent = state["intent"]
     chat_context = state["chat_context"]
-    
+    shortlist_ids = state.get("shortlist_product_ids") or []
+
+    # Load shortlisted product details for context
+    shortlisted_products_serialized = []
+    if shortlist_ids:
+        db_session = state["db_session"]
+        shortlisted_products = await _load_products_by_ids(
+            db_session, [UUID(pid) for pid in shortlist_ids]
+        )
+        shortlisted_products_serialized = [
+            _serialize_product_for_prompt(p) for p in shortlisted_products
+        ]
+
     system_prompt = (
         "You are Aisthetic, a playful, hype but honest AI fashion stylist for Gen Z and young millennials.\n"
         "Your vibe: casual, friendly, confident. No corporate tone.\n\n"
@@ -30,7 +43,8 @@ async def generate_response_node(state: AgentState) -> dict:
         "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n"
         "- If the user's request is ambiguous, conflicting, or lacks enough detail to make good recommendations, ask a brief clarifying question instead of recommending products.\n"
         "- When asking for clarification, set recommended_product_ids to an empty list [].\n"
-        "- Do not force recommendations when you're unsure — it's better to ask than to guess wrong.\n\n"
+        "- Do not force recommendations when you're unsure — it's better to ask than to guess wrong.\n"
+        "- The user has a shortlist of saved products (shortlisted_products). Be aware of these when making recommendations — avoid recommending items already shortlisted and acknowledge the shortlist when relevant.\n\n"
         "Output format (JSON ONLY, no extra text):\n"
         "{\n"
         '  "answer": "<your short message>",\n'
@@ -44,6 +58,7 @@ async def generate_response_node(state: AgentState) -> dict:
         "intent": intent.value,
         "candidate_products": candidate_products,
         "chat_context": chat_context,
+        "shortlisted_products": shortlisted_products_serialized,
     }
 
     chat_client = get_chat_client()
@@ -74,6 +89,7 @@ async def generate_response_node(state: AgentState) -> dict:
     response = StylistResponse(
         answer=parsed.get("answer", ""),
         recommended_product_ids=rec_ids,
+        shortlisted_product_ids=[UUID(pid) for pid in shortlist_ids],
         intent=intent
     )
     return {"response": response}

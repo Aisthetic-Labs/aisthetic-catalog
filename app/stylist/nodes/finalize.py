@@ -1,5 +1,8 @@
+from uuid import UUID
+
 from app.logger import logger
 from app.stylist.chat_context import get_chat_context_summarizer
+from app.stylist.shortlist_service import get_shortlist_service
 from app.stylist.state import AgentState
 
 async def finalize_node(state: AgentState) -> dict:
@@ -17,7 +20,13 @@ async def finalize_node(state: AgentState) -> dict:
     # 1) Commit all DB changes accumulated in previous nodes
     await db_session.commit()
 
-    # 2) Update Chat Context in Redis
+    # 2) Ensure shortlisted_product_ids is populated in every response
+    if not response.shortlisted_product_ids:
+        shortlist_service = get_shortlist_service()
+        shortlist_ids = await shortlist_service.get_all(chat_session_id)
+        response.shortlisted_product_ids = [UUID(pid) for pid in shortlist_ids]
+
+    # 3) Update Chat Context in Redis
     chat_context_summarizer = get_chat_context_summarizer()
     await chat_context_summarizer.append_exchange(
         chat_session_id=chat_session_id,

@@ -23,7 +23,8 @@ async def handle_stylist_chat(
         "db_session": db_session,
         "is_follow_up": False,
         "excluded_product_ids": [],
-        "refined_query": None
+        "refined_query": None,
+        "shortlist_product_ids": None
     }
 
     # Execute the graph

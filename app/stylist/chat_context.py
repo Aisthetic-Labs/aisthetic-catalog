@@ -88,6 +88,10 @@ class ChatContextSummarizer:
                 : self._product_tail
             ]
 
+        shortlisted_ids = [str(pid) for pid in (stylist_response.shortlisted_product_ids or [])]
+        if shortlisted_ids:
+            assistant_entry["shortlisted_product_ids"] = shortlisted_ids
+
         final_intent = stylist_response.intent or intent
         if final_intent:
             assistant_entry["intent"] = (

@@ -21,6 +21,7 @@ class AgentState(TypedDict):
     db_session: AsyncSession  # Active DB session
     intent: Optional[StylistIntent]  # Detected intent (e.g., product_search)
     chat_context: Optional[dict]  # Structured conversation history & summary
+    shortlist_product_ids: Optional[List[str]]  # product IDs from Redis shortlist
     # Annotated with operator.add to allow multiple nodes to contribute products
     candidate_products: Annotated[List[dict], operator.add]
     search_iteration: int  # Tracking number of search attempts

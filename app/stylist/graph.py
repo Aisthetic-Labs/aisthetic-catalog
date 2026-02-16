@@ -13,6 +13,7 @@ from app.stylist.nodes import (
     follow_up_node,
     onboarding_node,
     occasion_styling_node,
+    shortlist_node,
 )
 
 def route_intent(state: AgentState) -> str:
@@ -34,6 +35,8 @@ def route_intent(state: AgentState) -> str:
         return "small_talk"
     elif intent == StylistIntent.TRY_ON_REQUEST:
         return "try_on"
+    elif intent == StylistIntent.SHORTLIST_MANAGEMENT:
+        return "shortlist"
     elif intent == StylistIntent.FOLLOW_UP:
         return "follow_up"
     else:
@@ -76,6 +79,7 @@ def create_stylist_graph():
     workflow.add_node("try_on", try_on_node)
     workflow.add_node("finalize", finalize_node)
     workflow.add_node("onboarding", onboarding_node)
+    workflow.add_node("shortlist", shortlist_node)
 
     workflow.set_entry_point("initialize")
 
@@ -89,6 +93,7 @@ def create_stylist_graph():
             "small_talk": "small_talk",
             "try_on": "try_on",
             "follow_up": "follow_up",
+            "shortlist": "shortlist",
             "onboarding": "onboarding",
         }
     )
@@ -118,6 +123,7 @@ def create_stylist_graph():
     workflow.add_edge("small_talk", "finalize")
     workflow.add_edge("try_on", "finalize")
     workflow.add_edge("onboarding", "finalize")
+    workflow.add_edge("shortlist", "finalize")
     workflow.add_edge("finalize", END)
 
     return workflow.compile()
