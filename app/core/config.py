@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     CHAT_SESSION_TTL_SECONDS: int = Field(default=6 * 60 * 60)
     CHAT_SESSION_STORAGE_TURNS: int = Field(default=40)
     CHAT_SESSION_SUMMARY_PRODUCT_LIMIT: int = Field(default=6)
+    CHAT_SESSION_CONTEXT_WINDOW: int = Field(default=12)
 
     class Config:
         env_file = ".env"

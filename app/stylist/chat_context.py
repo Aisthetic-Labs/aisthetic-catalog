@@ -44,7 +44,7 @@ class ChatContextSummarizer:
         self._redis = redis_client or get_redis_client()
         self._history_limit = settings.CHAT_SESSION_STORAGE_TURNS
         self._product_tail = settings.CHAT_SESSION_SUMMARY_PRODUCT_LIMIT
-        self._window = min(12, self._history_limit)
+        self._window = min(settings.CHAT_SESSION_CONTEXT_WINDOW, self._history_limit)
 
     async def build_context(
         self,
