@@ -12,13 +12,16 @@ async def follow_up_node(state: AgentState) -> dict:
     message = state["message"]
     chat_context = state["chat_context"]
 
-    # Extract excluded product IDs from chat context (previously recommended)
-    excluded_ids = []
-    if chat_context and "recent_recommended_product_ids" in chat_context:
-        excluded_ids = chat_context["recent_recommended_product_ids"]
-
     # Build history turns from backend-managed conversation window
     conversation_window = chat_context.get("conversation_window", [])
+
+    # Extract excluded product IDs from conversation window (previously recommended)
+    excluded_ids = [
+        pid
+        for entry in conversation_window
+        if entry.get("role") == "assistant"
+        for pid in entry.get("recommended_product_ids") or []
+    ]
     history_turns = [ChatTurn(role=h["role"], message=h["message"]) for h in conversation_window]
     
     # Use complete_stylist_query to get a merged standalone query and filters

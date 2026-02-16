@@ -121,30 +121,9 @@ class ChatContextSummarizer:
 
     def _render_context(self, history: Sequence[HistoryEntry]) -> dict[str, Any]:
         window = list(history[-self._window :])
-        summary_lines = [f"{e['role']}: {e['message']}" for e in window]
-        recommended = self._collect_recent_recommendations(window)
         return {
             "conversation_window": window,
-            "conversation_summary": "\n".join(summary_lines),
-            "recent_recommended_product_ids": recommended,
         }
-
-    def _collect_recent_recommendations(
-        self, window: Sequence[HistoryEntry]
-    ) -> list[str]:
-        collected: list[str] = []
-        seen: set[str] = set()
-        for entry in reversed(window):
-            if entry.get("role") != "assistant":
-                continue
-            for pid in entry.get("recommended_product_ids") or []:
-                if pid in seen:
-                    continue
-                collected.append(pid)
-                seen.add(pid)
-                if len(collected) >= self._product_tail:
-                    return collected
-        return collected
 
 
 _summarizer_singleton: ChatContextSummarizer | None = None
