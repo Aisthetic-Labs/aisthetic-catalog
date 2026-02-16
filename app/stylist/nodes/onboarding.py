@@ -245,6 +245,27 @@ async def _extract_name_dob(message: str) -> dict:
 # Helpers
 # ---------------------------------------------------------------------------
 
+_MIN_AGE = 13
+_MAX_AGE = 120
+
+
+def _validate_dob(dob_str: str | None) -> date | None:
+    """Return a valid date or None if invalid / out of range."""
+    if not dob_str:
+        return None
+    try:
+        dob = date.fromisoformat(dob_str)
+    except (ValueError, TypeError):
+        return None
+    today = date.today()
+    if dob > today:
+        return None
+    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    if age < _MIN_AGE or age > _MAX_AGE:
+        return None
+    return dob
+
+
 def _is_skip(message: str) -> bool:
     return message.strip().lower() == "skip"
 
@@ -276,13 +297,7 @@ async def _finalize_onboarding(state: AgentState, data: dict) -> dict:
     external_user_id = state["external_user_id"]
     chat_session_id = state["chat_session_id"]
 
-    # Parse dob
-    dob_value = None
-    if data.get("dob"):
-        try:
-            dob_value = date.fromisoformat(data["dob"])
-        except (ValueError, TypeError):
-            pass
+    dob_value = _validate_dob(data.get("dob"))
 
     # Create UserProfile
     profile = UserProfile(
@@ -392,8 +407,31 @@ async def onboarding_node(state: AgentState) -> dict:
     # --- Step: name_dob ---
     if step == "name_dob":
         extracted = await _extract_name_dob(message)
-        data["name"] = extracted.get("name")
-        data["dob"] = extracted.get("dob")
+        name = extracted.get("name")
+        dob = _validate_dob(extracted.get("dob"))
+
+        if not name or not dob:
+            # Re-ask with a hint about what's missing
+            parts = []
+            if not name:
+                parts.append("your name")
+            if not dob:
+                parts.append("a valid date of birth")
+            missing = " and ".join(parts)
+            await store.set_onboarding_state(chat_session_id, "name_dob", data)
+            return {
+                "response": StylistResponse(
+                    answer=(
+                        f"I couldn't catch {missing}. Could you try again?\n\n"
+                        "For example: Arjun, 15 April 1996"
+                    ),
+                    recommended_product_ids=[],
+                    intent=intent,
+                ),
+            }
+
+        data["name"] = name
+        data["dob"] = dob.isoformat()
         await store.set_onboarding_state(chat_session_id, "gender", data)
         return _next_step_response("gender", intent)
 
