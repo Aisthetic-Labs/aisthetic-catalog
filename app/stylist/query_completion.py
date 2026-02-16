@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any, Optional, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.llm.client import get_chat_client
 from app.core.config import settings
 from app.logger import logger
@@ -22,6 +22,11 @@ class CompletedStylistQuery(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     sizes: List[str] = []
+
+    @field_validator("garment_types", "colors", "sizes", mode="before")
+    @classmethod
+    def none_to_empty_list(cls, v):
+        return v if v is not None else []
 
 
 QUERY_COMPLETION_INSTRUCTIONS = """
