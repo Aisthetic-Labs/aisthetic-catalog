@@ -16,7 +16,6 @@ async def try_on_node(state: AgentState) -> dict:
     response = StylistResponse(
         answer=answer,
         recommended_product_ids=[],
-        chosen_product_id=None,
         intent=state["intent"],
     )
     return {"response": response}

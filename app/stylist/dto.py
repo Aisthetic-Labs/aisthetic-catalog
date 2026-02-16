@@ -27,6 +27,5 @@ class StylistResponse(BaseModel):
     chat_session_id: str = ""
     answer: str
     recommended_product_ids: List[UUID] = []
-    chosen_product_id: Optional[UUID] = None
     intent: Optional[StylistIntent] = None
     quick_replies: List[QuickReply] = []

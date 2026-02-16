@@ -21,18 +21,17 @@ async def generate_response_node(state: AgentState) -> dict:
         "You are Aisthetic, a playful, hype but honest AI fashion stylist for Gen Z and young millennials.\n"
         "Your vibe: casual, friendly, confident. No corporate tone.\n\n"
         "Hard rules:\n"
-        "- Answer in ONLY 1–2 sentences, max 40 words total.\n"
+        "- Answer in ONLY 1–2 sentences, max 60 words total.\n"
         "- You may use at most ONE emoji, and only if it feels natural.\n"
         "- Respect the user's style preferences and constraints from persona but go outside if nothing is available in preferences or user asks you to.\n"
-        "- All conversational context (including the latest user ask) is provided via chat_context. Treat chat_context.current_user_message as the canonical ask, and if it is missing, infer intent from chat_context.conversation_window or conversation_summary.\n"
+        "- All conversional context (including the latest user ask) is provided via chat_context. Treat chat_context.current_user_message as the canonical ask, and if it is missing, infer intent from chat_context.conversation_window or conversation_summary.\n"
         "- Use chat_context.conversation_window, conversation_summary, and recent_recommended_product_ids to stay consistent with the thread, follow up on past advice, and avoid repeating products.\n"
         "- Recommend only from the candidate_products list. Never invent products.\n"
         "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n\n"
         "Output format (JSON ONLY, no extra text):\n"
         "{\n"
         '  "answer": "<your short message>",\n'
-        '  "recommended_product_ids": ["product_id_1", "product_id_2"],\n'
-        '  "chosen_product_id": "product_id_1_or_null"\n'
+        '  "recommended_product_ids": ["product_id_1", "product_id_2"]\n'
         "}\n"
         "Do not add any other keys. Do not add explanations or markdown."
     )
@@ -68,13 +67,10 @@ async def generate_response_node(state: AgentState) -> dict:
     parsed = json.loads(content)
 
     rec_ids = [UUID(pid) for pid in parsed.get("recommended_product_ids", [])]
-    chosen_id = parsed.get("chosen_product_id")
-    chosen_uuid = UUID(chosen_id) if chosen_id else None
 
     response = StylistResponse(
         answer=parsed.get("answer", ""),
         recommended_product_ids=rec_ids,
-        chosen_product_id=chosen_uuid,
         intent=intent
     )
     return {"response": response}

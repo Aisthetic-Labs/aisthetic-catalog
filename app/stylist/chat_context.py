@@ -88,11 +88,6 @@ class ChatContextSummarizer:
                 : self._product_tail
             ]
 
-        if stylist_response.chosen_product_id:
-            assistant_entry["chosen_product_id"] = str(
-                stylist_response.chosen_product_id
-            )
-
         final_intent = stylist_response.intent or intent
         if final_intent:
             assistant_entry["intent"] = (
