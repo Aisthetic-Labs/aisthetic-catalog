@@ -60,7 +60,6 @@ async def create_demo_user(merchant_id: str, external_user_id: str):
                 "disliked_colors": ["neon green"],
                 "liked_fits": ["slim", "regular"],
                 "liked_styles": ["minimal", "smart casual"],
-                "liked_occasions": ["office", "party", "wedding"],
                 "price_sensitivity": "mid",
             },
         )

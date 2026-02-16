@@ -34,7 +34,7 @@ class UserPreferences(TenantBase):
     """
     Mutable style preferences stored as flexible JSONB.
     Keys include: body_type, preferred_sizes, liked_colors, disliked_colors,
-    liked_fits, liked_styles, liked_occasions, price_sensitivity, persona_summary.
+    liked_fits, liked_styles, price_sensitivity, persona_summary.
     """
     __tablename__ = "user_preferences"
 

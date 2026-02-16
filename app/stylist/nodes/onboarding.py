@@ -188,20 +188,6 @@ ONBOARDING_STEPS: list[dict] = [
             QuickReply(label="Oversized", payload={"value": "oversized"}),
         ],
         "optional": True,
-        "next": "going_out_occasions",
-    },
-    {
-        "key": "going_out_occasions",
-        "prompt": "Where do you usually dress up for? Pick or list a few.",
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-            QuickReply(label="Casual", payload={"value": "casual"}),
-            QuickReply(label="Office", payload={"value": "office"}),
-            QuickReply(label="Party / Night Out", payload={"value": "party"}),
-            QuickReply(label="Date Night", payload={"value": "date night"}),
-            QuickReply(label="Travel", payload={"value": "travel"}),
-        ],
-        "optional": True,
         "next": "price_sensitivity",
     },
     {
@@ -314,7 +300,7 @@ async def _finalize_onboarding(state: AgentState, data: dict) -> dict:
         "body_type", "height_weight", "preferred_top_sizes",
         "preferred_bottom_sizes", "preferred_shoe_size",
         "liked_colors", "disliked_colors", "liked_fits",
-        "going_out_occasions", "price_sensitivity",
+        "price_sensitivity",
     ]
     prefs_dict: dict = {}
     for k in pref_keys:
@@ -330,8 +316,6 @@ async def _finalize_onboarding(state: AgentState, data: dict) -> dict:
         prefs_dict["disliked_colors"] = _to_list(val)
     if "liked_fits" in prefs_dict:
         prefs_dict["liked_fits"] = _to_list(prefs_dict["liked_fits"])
-    if "going_out_occasions" in prefs_dict:
-        prefs_dict["liked_occasions"] = _to_list(prefs_dict.pop("going_out_occasions"))
     if "preferred_top_sizes" in prefs_dict:
         prefs_dict["preferred_sizes"] = _to_list(prefs_dict.pop("preferred_top_sizes"))
         # Keep bottom sizes as a separate key
