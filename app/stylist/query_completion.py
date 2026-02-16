@@ -30,7 +30,7 @@ class CompletedStylistQuery(BaseModel):
 
 
 QUERY_COMPLETION_INSTRUCTIONS = """
-You are Aisthetic's query normalizer.
+You are a fashion shopping query normalizer.
 
 You will receive:
 - `conversation`: recent chat history as a list of {role, message}

@@ -12,7 +12,7 @@ from app.stylist.state import AgentState
 from .helpers import _load_products_by_ids, _serialize_product_for_prompt
 
 SHORTLIST_RESOLVE_PROMPT = """\
-You are a shortlist assistant for an AI fashion stylist.
+You are a shortlist assistant for an AI fashion salesperson.
 Your job is to interpret the user's request about their shortlist and resolve product references.
 
 The user's shortlist (numbered):

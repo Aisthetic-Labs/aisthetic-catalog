@@ -14,7 +14,7 @@ router = APIRouter(
 )
 
 WELCOME_MESSAGE = (
-    "Hey, I'm your AI stylist from Aisthetic \U0001f44b\n\n"
+    "Hey, I'm your AI fashion assistant \U0001f44b\n\n"
     "I can help you:\n"
     "- Pick outfits for occasions (weddings, dates, office, trips)\n"
     "- Decide between two garments\n"

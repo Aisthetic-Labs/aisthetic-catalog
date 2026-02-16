@@ -5,7 +5,7 @@ from app.llm.client import get_chat_client
 from .intents import STYLIST_INTENTS, StylistIntent
 
 INTENT_PROMPT = """
-You are Aisthetic's intent classifier.
+You are a fashion shopping intent classifier.
 You will receive a user query delimited by <qs></qs>.
 You must classify it into ONE of the intents defined below.
 
@@ -30,7 +30,7 @@ async def detect_intent(message: str) -> StylistIntent:
     resp = await chat_client.chat.completions.create(
         model=settings.STYLIST_MODEL_NAME,
         messages=[
-            {"role": "system", "content": "Classify fashion & styling intents."},
+            {"role": "system", "content": "Classify fashion shopping intents."},
             {"role": "user", "content": content},
         ],
         response_format={"type": "json_object"},

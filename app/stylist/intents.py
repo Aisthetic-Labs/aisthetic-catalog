@@ -62,7 +62,7 @@ STYLIST_INTENTS = [
     },
     {
         "name": StylistIntent.HELP_ABOUT_AISTHETIC.value,
-        "description": "User asks about what Aisthetic does or how to use the stylist.",
+        "description": "User asks about what this service does or how to use it.",
         "examples": [
             "What can you do?",
             "How does this stylist work?",
