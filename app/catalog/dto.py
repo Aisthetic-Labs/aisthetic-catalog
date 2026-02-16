@@ -47,6 +47,7 @@ class CatalogSearchRequest(BaseModel):
     filters: CatalogFilter = CatalogFilter()
     limit: int = 10
     user_persona: Optional[Dict] = None  # reserved for later
+    excluded_product_ids: Optional[List[str]] = None
 
 
 class ProductOut(BaseModel):

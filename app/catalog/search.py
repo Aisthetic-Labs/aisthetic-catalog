@@ -67,20 +67,29 @@ def _build_search_body(
     filter_clauses: List[Dict[str, Any]],
     limit: int,
     query_vector: List[float] | None = None,
+    must_not_clauses: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     """Build an OpenSearch request body for either kNN or filter-only search."""
     if query_vector is not None:
         knn_field_obj: Dict[str, Any] = {"vector": query_vector, "k": limit}
-        if filter_clauses:
-            knn_field_obj["filter"] = {"bool": {"filter": filter_clauses}}
+        if filter_clauses or must_not_clauses:
+            bool_filter: Dict[str, Any] = {}
+            if filter_clauses:
+                bool_filter["filter"] = filter_clauses
+            if must_not_clauses:
+                bool_filter["must_not"] = must_not_clauses
+            knn_field_obj["filter"] = {"bool": bool_filter}
         return {
             "size": limit,
             "query": {"knn": {"embedding": knn_field_obj}},
         }
+    bool_query: Dict[str, Any] = {"filter": filter_clauses or [{"match_all": {}}]}
+    if must_not_clauses:
+        bool_query["must_not"] = must_not_clauses
     return {
         "size": limit,
         "sort": [{"_id": "desc"}],
-        "query": {"bool": {"filter": filter_clauses or [{"match_all": {}}]}},
+        "query": {"bool": bool_query},
     }
 
 
@@ -101,17 +110,22 @@ async def search_products(
     query_text = req.query_text
     query_vector = await embed_text(query_text) if query_text else None
 
+    # Build must_not for excluded product IDs
+    must_not_clauses: List[Dict[str, Any]] | None = None
+    if req.excluded_product_ids:
+        must_not_clauses = [{"ids": {"values": req.excluded_product_ids}}]
+
     # Try with persona filters first
     filter_clauses = _build_filter_clauses(req.filters, req.user_persona)
     logger.info(f"[Search] Built filters: {filter_clauses}")
-    body = _build_search_body(filter_clauses, req.limit, query_vector)
+    body = _build_search_body(filter_clauses, req.limit, query_vector, must_not_clauses)
     res = client.search(index=index_name, body=body)
 
     # Fallback 1: drop persona filters
     if _hit_count(res) == 0 and req.user_persona:
         logger.info("[Search] No results with persona filters, falling back to basic filters")
         basic_filters = _build_filter_clauses(req.filters, None)
-        body = _build_search_body(basic_filters, req.limit, query_vector)
+        body = _build_search_body(basic_filters, req.limit, query_vector, must_not_clauses)
         res = client.search(index=index_name, body=body)
 
     # Fallback 2: also drop size filter
@@ -120,7 +134,7 @@ async def search_products(
         logger.info("[Search] No results with size filter, falling back without size constraint")
         relaxed_filters = req.filters.model_copy(update={"sizes": None})
         size_relaxed_clauses = _build_filter_clauses(relaxed_filters, None)
-        body = _build_search_body(size_relaxed_clauses, req.limit, query_vector)
+        body = _build_search_body(size_relaxed_clauses, req.limit, query_vector, must_not_clauses)
         res = client.search(index=index_name, body=body)
 
     hits = res.get("hits", {}).get("hits", [])

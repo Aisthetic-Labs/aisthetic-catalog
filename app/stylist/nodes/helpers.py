@@ -80,22 +80,17 @@ async def _search_and_load_products(
         filters.color = []
         filters.category = None
 
-    fetch_limit = limit + len(excluded_product_ids) if excluded_product_ids else limit
-
     search_req = CatalogSearchRequest(
         query_text=query_text,
         filters=filters,
-        limit=fetch_limit,
+        limit=limit,
         user_persona=user_persona,
+        excluded_product_ids=[str(eid) for eid in excluded_product_ids] if excluded_product_ids else None,
     )
     logger.info(f"[AgentFlow] Search request: {search_req}")
     hits = await search_products(merchant_id, search_req)
 
-    if excluded_product_ids:
-        excluded_set = {str(eid) for eid in excluded_product_ids}
-        ids = [UUID(h["product_id"]) for h in hits if h["product_id"] not in excluded_set][:limit]
-    else:
-        ids = [UUID(h["product_id"]) for h in hits]
+    ids = [UUID(h["product_id"]) for h in hits]
 
     sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
     products = await _load_products_by_ids(db_session, ids)
