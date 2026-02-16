@@ -1,6 +1,5 @@
 import json
 from app.logger import logger
-from app.stylist.intents import StylistIntent
 from app.stylist.query_completion import ChatTurn, complete_stylist_query
 from app.stylist.state import AgentState
 from app.stylist.nodes.helpers import _search_and_load_products
@@ -8,9 +7,9 @@ from app.stylist.nodes.helpers import _search_and_load_products
 async def product_search_node(state: AgentState) -> dict:
     """
     Handles search-related intents by querying OpenSearch.
-    This node is only visited if the intent requires product candidates.
+    Uses refined_query from upstream nodes (occasion_styling, follow_up)
+    or runs query completion itself (direct_product_search, general_styling).
     """
-    intent = state["intent"]
     merchant_id = state["merchant_id"]
     db_session = state["db_session"]
     message = state["message"]
@@ -25,24 +24,20 @@ async def product_search_node(state: AgentState) -> dict:
         except Exception:
             logger.warning("[AgentFlow] Failed to parse persona_json for search")
 
-    logger.info(f"[AgentFlow] Entering product_search_node for intent: {intent.value}")
+    logger.info("[AgentFlow] Entering product_search_node")
 
-    # Build history turns from backend-managed conversation window
-    conversation_window = chat_context.get("conversation_window", [])
-    history_turns = [ChatTurn(role=h["role"], message=h["message"]) for h in conversation_window]
-
-    # --- Route by intent to set cq, query_text, excluded ---
-    excluded = None
-    if intent == StylistIntent.FOLLOW_UP and state.get("refined_query"):
+    # Use refined_query if an upstream node (occasion_styling, follow_up) set it
+    if state.get("refined_query"):
         cq = state["refined_query"]
         query_text = cq.standalone_query or message
-        excluded = state.get("excluded_product_ids", [])
-    elif intent == StylistIntent.OCCASION_STYLING:
-        cq = await complete_stylist_query(history_turns, message)
-        query_text = cq.standalone_query or f"outfit for {cq.occasion or message}"
     else:
+        # Direct product search / general styling — run query completion here
+        conversation_window = chat_context.get("conversation_window", [])
+        history_turns = [ChatTurn(role=h["role"], message=h["message"]) for h in conversation_window]
         cq = await complete_stylist_query(history_turns, message)
         query_text = cq.standalone_query or message
+
+    excluded = state.get("excluded_product_ids") or []
 
     candidate_products = await _search_and_load_products(
         merchant_id=merchant_id,

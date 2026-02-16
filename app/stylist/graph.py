@@ -12,6 +12,7 @@ from app.stylist.nodes import (
     finalize_node,
     follow_up_node,
     onboarding_node,
+    occasion_styling_node,
 )
 
 def route_intent(state: AgentState) -> str:
@@ -23,8 +24,9 @@ def route_intent(state: AgentState) -> str:
     logger.info(f"[AgentFlow] Routing based on intent: {intent.value}")
     if intent == StylistIntent.ONBOARDING:
         return "onboarding"
-    if intent in (StylistIntent.OCCASION_STYLING,
-                  StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
+    if intent == StylistIntent.OCCASION_STYLING:
+        return "occasion_styling"
+    if intent in (StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
         return "product_search"
     elif intent == StylistIntent.PROFILE_UPDATE:
         return "profile_update"
@@ -52,10 +54,20 @@ def route_search_result(state: AgentState) -> str:
 
     return "generate_response"
 
+def route_occasion_result(state: AgentState) -> str:
+    """
+    After occasion_styling: if a response was set (clarification needed),
+    go to finalize. Otherwise proceed to product_search.
+    """
+    if state.get("response"):
+        return "finalize"
+    return "product_search"
+
 def create_stylist_graph():
     workflow = StateGraph(AgentState)
 
     workflow.add_node("initialize", initialize_node)
+    workflow.add_node("occasion_styling", occasion_styling_node)
     workflow.add_node("follow_up", follow_up_node)
     workflow.add_node("product_search", product_search_node)
     workflow.add_node("generate_response", generate_response_node)
@@ -72,11 +84,21 @@ def create_stylist_graph():
         route_intent,
         {
             "product_search": "product_search",
+            "occasion_styling": "occasion_styling",
             "profile_update": "profile_update",
             "small_talk": "small_talk",
             "try_on": "try_on",
             "follow_up": "follow_up",
             "onboarding": "onboarding",
+        }
+    )
+
+    workflow.add_conditional_edges(
+        "occasion_styling",
+        route_occasion_result,
+        {
+            "product_search": "product_search",
+            "finalize": "finalize",
         }
     )
 

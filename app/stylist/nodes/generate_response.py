@@ -27,7 +27,10 @@ async def generate_response_node(state: AgentState) -> dict:
         "- All conversational context (including the latest user ask) is provided via chat_context. Treat chat_context.current_user_message as the canonical ask, and if it is missing, infer intent from chat_context.conversation_window.\n"
         "- Use chat_context.conversation_window to stay consistent with the thread, follow up on past advice, and avoid repeating products.\n"
         "- Recommend only from the candidate_products list. Never invent products.\n"
-        "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n\n"
+        "- If nothing fits well, say that honestly and suggest what to look for instead (still in 1–2 sentences).\n"
+        "- If the user's request is ambiguous, conflicting, or lacks enough detail to make good recommendations, ask a brief clarifying question instead of recommending products.\n"
+        "- When asking for clarification, set recommended_product_ids to an empty list [].\n"
+        "- Do not force recommendations when you're unsure — it's better to ask than to guess wrong.\n\n"
         "Output format (JSON ONLY, no extra text):\n"
         "{\n"
         '  "answer": "<your short message>",\n'
