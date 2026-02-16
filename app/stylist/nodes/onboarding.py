@@ -13,14 +13,10 @@ from app.stylist.persona import summarize_persona
 from app.stylist.session_store import get_session_store
 from app.stylist.state import AgentState
 
-# Welcome assets (duplicated from stylist_routes to avoid circular import)
-WELCOME_MESSAGE = (
-    "Hey, I'm your AI stylist from Aisthetic \U0001f44b\n\n"
-    "I can help you:\n"
-    "- Pick outfits for occasions (weddings, dates, office, trips)\n"
-    "- Decide between two garments\n"
-    "- Discover pieces that match your style\n\n"
-    "Tell me what you're shopping for, or pick an option below."
+ONBOARDING_COMPLETE_MESSAGE = (
+    "You're all set! I've got your style profile ready.\n\n"
+    "Now let's find you something great — tell me what you're looking for, "
+    "or pick an option below."
 )
 
 WELCOME_QUICK_REPLIES = [
@@ -357,7 +353,7 @@ async def _finalize_onboarding(state: AgentState, data: dict) -> dict:
 
     return {
         "response": StylistResponse(
-            answer=WELCOME_MESSAGE,
+            answer=ONBOARDING_COMPLETE_MESSAGE,
             recommended_product_ids=[],
             intent=StylistIntent.ONBOARDING,
             quick_replies=WELCOME_QUICK_REPLIES,
