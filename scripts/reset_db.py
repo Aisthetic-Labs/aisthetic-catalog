@@ -7,6 +7,8 @@ Usage:
 
 import asyncio
 
+from sqlalchemy import text
+
 from app.core.db_control import ControlBase, ControlSessionLocal, control_engine
 from app.control.models_control import Merchant, MerchantDBConnection, MerchantStatus
 
@@ -52,7 +54,9 @@ async def _reset_tenant_db(merchant_id: str):
     """Drop and recreate all tenant tables (catalog + user)."""
     engine = get_tenant_engine(merchant_id)
     async with engine.begin() as conn:
-        await conn.run_sync(TenantBase.metadata.drop_all)
+        # Use CASCADE to handle leftover tables / FK deps not in current models
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(TenantBase.metadata.create_all)
     await engine.dispose()
 
