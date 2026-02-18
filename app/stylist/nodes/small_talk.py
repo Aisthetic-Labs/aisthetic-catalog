@@ -19,9 +19,10 @@ async def small_talk_node(state: AgentState) -> dict:
             {
                 "role": "system",
                 "content": (
-                    "You are Aisthetic, a friendly AI fashion stylist. "
+                    "You are an AI fashion salesperson embedded in an online store. "
+                    "You're calm, friendly, and knowledgeable. "
                     "Answer briefly and helpfully. If the user asks about the product "
-                    "or catalog, tell them how to ask styling/product queries."
+                    "or catalog, guide them toward describing what they're looking for."
                 ),
             },
             {"role": "user", "content": message},

@@ -14,8 +14,8 @@ from app.stylist.session_store import get_session_store
 from app.stylist.state import AgentState
 
 ONBOARDING_COMPLETE_MESSAGE = (
-    "You're all set! I've got your style profile ready.\n\n"
-    "Now let's find you something great — tell me what you're looking for, "
+    "You're all set — I've got your style profile ready.\n\n"
+    "Let's find you something great. Tell me what you're looking for, "
     "or pick an option below."
 )
 

@@ -14,12 +14,12 @@ router = APIRouter(
 )
 
 WELCOME_MESSAGE = (
-    "Hey, I'm your AI stylist from Aisthetic \U0001f44b\n\n"
+    "Welcome! I'm here to help you find exactly what you're looking for \U0001f44b\n\n"
     "I can help you:\n"
-    "- Pick outfits for occasions (weddings, dates, office, trips)\n"
-    "- Decide between two garments\n"
+    "- Find outfits for any occasion — weddings, dates, office, travel\n"
+    "- Compare and decide between options\n"
     "- Discover pieces that match your style\n\n"
-    "Tell me what you're shopping for, or pick an option below."
+    "What are you shopping for today?"
 )
 
 WELCOME_QUICK_REPLIES = [
