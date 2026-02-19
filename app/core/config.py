@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     CHAT_SESSION_CONTEXT_WINDOW: int = Field(default=20)
     SHORTLIST_MAX_SIZE: int = Field(default=10)
 
+    # mem0 (persistent user memory)
+    MEM0_API_KEY: str = Field(default="")
+    MEM0_ENABLED: bool = Field(default=True)
+
+    # Brave Search (trend awareness)
+    BRAVE_SEARCH_API_KEY: str = Field(default="")
+    BRAVE_SEARCH_ENABLED: bool = Field(default=True)
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

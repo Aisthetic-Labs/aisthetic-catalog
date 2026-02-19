@@ -32,5 +32,9 @@ class AgentState(TypedDict):
     refined_query: Optional[CompletedStylistQuery]  # Merged query for follow-ups
     excluded_product_ids: List[UUID]  # IDs to exclude from search results
     
+    # --- Enrichment Fields ---
+    user_memories: Optional[List[dict]]  # mem0 recalled memories for this user
+    trend_context: Optional[str]  # Brave Search results for trend queries
+
     # --- Output Fields ---
     response: Optional[StylistResponse]  # Final response returned to API

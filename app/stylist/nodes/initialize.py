@@ -68,6 +68,13 @@ async def initialize_node(state: AgentState) -> dict:
     shortlist_service = get_shortlist_service()
     shortlist_product_ids = await shortlist_service.get_all(chat_session_id)
 
+    # 5.5) Recall relevant memories from mem0
+    from app.stylist.memory_service import recall_memories
+    user_memories = await recall_memories(
+        user_id=f"{state['merchant_id']}:{external_user_id}",
+        query=state["message"],
+    )
+
     # 6) Detect User Intent (e.g., search, styling, small talk)
     intent = await detect_intent(state["message"])
     logger.info(f"[AgentFlow] Detected intent: {intent.value}")
@@ -78,4 +85,5 @@ async def initialize_node(state: AgentState) -> dict:
         "intent": intent,
         "search_iteration": 0,
         "shortlist_product_ids": shortlist_product_ids,
+        "user_memories": user_memories,
     }

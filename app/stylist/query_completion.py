@@ -22,6 +22,7 @@ class CompletedStylistQuery(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     sizes: List[str] = []
+    web_search_query: Optional[str] = None
 
     @field_validator("garment_types", "colors", "sizes", mode="before")
     @classmethod
@@ -47,6 +48,7 @@ Your job:
    - occasion: e.g. "wedding", "office", "party", "vacation"
    - price_min / price_max: numeric INR if mentioned
    - sizes: e.g. ["M", "L", "32", "UK8"] — clothing/shoe sizes mentioned
+   - web_search_query: If the user's request involves current fashion trends, celebrity/cultural references, or seasonal style advice that goes beyond catalog search, write a concise web search query to find relevant context. Otherwise set to null. Examples: "men's summer fashion trends 2026", "Timothée Chalamet outfit style"
 
 Return ONLY a JSON object with keys:
 {
@@ -58,7 +60,8 @@ Return ONLY a JSON object with keys:
   "occasion": "... or null",
   "price_min": null or number,
   "price_max": null or number,
-  "sizes": [...]
+  "sizes": [...],
+  "web_search_query": "... or null"
 }
 """
 

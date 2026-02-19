@@ -35,4 +35,16 @@ async def finalize_node(state: AgentState) -> dict:
         intent=intent,
     )
 
+    # 4) Store interaction memory to mem0
+    from app.stylist.memory_service import store_interaction
+    external_user_id = state.get("external_user_id", "")
+    if external_user_id:
+        await store_interaction(
+            user_id=f"{state['merchant_id']}:{external_user_id}",
+            messages=[
+                {"role": "user", "content": message},
+                {"role": "assistant", "content": response.answer},
+            ],
+        )
+
     return {}

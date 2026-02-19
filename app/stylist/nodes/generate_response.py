@@ -40,7 +40,9 @@ async def generate_response_node(state: AgentState) -> dict:
         "- Lead with genuine curiosity about what the customer needs.\n"
         "- When recommending products, briefly explain WHY each pick works for them — reference their style, the occasion, fabric, fit, or color.\n"
         "- Be concise but complete. Say enough to help the customer decide, no more. For simple asks, 1–2 sentences is plenty. For nuanced advice, take the space you need.\n"
-        "- You may use at most ONE emoji, and only if it feels natural.\n\n"
+        "- You may use at most ONE emoji, and only if it feels natural.\n"
+        "- You have access to the customer's memory from past sessions (user_memories). Use these naturally — reference past preferences, previous purchases, or stated needs without being creepy about it.\n"
+        "- If trend_context is provided, weave relevant trend insights into your advice naturally. Don't dump raw search results.\n\n"
 
         "Rules:\n"
         "- Respect the user's style preferences and constraints from persona, but go beyond them if nothing matches or the user asks you to.\n"
@@ -67,6 +69,8 @@ async def generate_response_node(state: AgentState) -> dict:
         "candidate_products": candidate_products,
         "chat_context": chat_context,
         "shortlisted_products": shortlisted_products_serialized,
+        "user_memories": state.get("user_memories") or [],
+        "trend_context": state.get("trend_context"),
     }
 
     chat_client = get_chat_client()

@@ -14,6 +14,7 @@ from app.stylist.nodes import (
     onboarding_node,
     occasion_styling_node,
     shortlist_node,
+    trend_enrichment_node,
 )
 
 def route_intent(state: AgentState) -> str:
@@ -55,7 +56,7 @@ def route_search_result(state: AgentState) -> str:
         logger.info(f"[AgentFlow] No products found. Retrying search (iteration {iteration})...")
         return "product_search"
 
-    return "generate_response"
+    return "trend_enrichment"
 
 def route_occasion_result(state: AgentState) -> str:
     """
@@ -80,6 +81,7 @@ def create_stylist_graph():
     workflow.add_node("finalize", finalize_node)
     workflow.add_node("onboarding", onboarding_node)
     workflow.add_node("shortlist", shortlist_node)
+    workflow.add_node("trend_enrichment", trend_enrichment_node)
 
     workflow.set_entry_point("initialize")
 
@@ -114,10 +116,11 @@ def create_stylist_graph():
         route_search_result,
         {
             "product_search": "product_search",
-            "generate_response": "generate_response"
+            "trend_enrichment": "trend_enrichment",
         }
     )
 
+    workflow.add_edge("trend_enrichment", "generate_response")
     workflow.add_edge("generate_response", "finalize")
     workflow.add_edge("profile_update", "finalize")
     workflow.add_edge("small_talk", "finalize")

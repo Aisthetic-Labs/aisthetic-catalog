@@ -27,8 +27,9 @@ async def product_search_node(state: AgentState) -> dict:
     logger.info("[AgentFlow] Entering product_search_node")
 
     # Use refined_query if an upstream node (occasion_styling, follow_up) set it
-    if state.get("refined_query"):
-        cq = state["refined_query"]
+    upstream_query = state.get("refined_query")
+    if upstream_query:
+        cq = upstream_query
         query_text = cq.standalone_query or message
     else:
         # Direct product search / general styling — run query completion here
@@ -50,7 +51,11 @@ async def product_search_node(state: AgentState) -> dict:
     )
 
     logger.info(f"[AgentFlow] Found {len(candidate_products)} candidate products")
-    return {
+    result: dict = {
         "candidate_products": candidate_products,
         "search_iteration": search_iteration + 1,
     }
+    # Pass refined_query to state so trend_enrichment can read web_search_query
+    if not upstream_query:
+        result["refined_query"] = cq
+    return result

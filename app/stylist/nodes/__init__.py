@@ -9,6 +9,7 @@ from .follow_up import follow_up_node
 from .onboarding import onboarding_node
 from .occasion_styling import occasion_styling_node
 from .shortlist import shortlist_node
+from .trend_enrichment import trend_enrichment_node
 
 __all__ = [
     "initialize_node",
@@ -22,4 +23,5 @@ __all__ = [
     "onboarding_node",
     "occasion_styling_node",
     "shortlist_node",
+    "trend_enrichment_node",
 ]
