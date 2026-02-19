@@ -22,8 +22,6 @@ class UserProfile(TenantBase):
     name = Column(String, nullable=True)
     dob = Column(Date, nullable=True)
     gender = Column(String, nullable=True)  # "male"/"female"/"unisex"/etc
-    fashion_taste = Column(String, nullable=True)
-
     meta = Column(JSONB, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

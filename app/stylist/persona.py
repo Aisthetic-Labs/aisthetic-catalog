@@ -53,7 +53,6 @@ async def summarize_persona(
         f"Name: {user.name or 'Unknown'}\n"
         f"Date of Birth: {user.dob or 'Unknown'}\n"
         f"Gender: {user.gender or 'Unknown'}\n"
-        f"Fashion Taste: {user.fashion_taste or 'Unknown'}\n"
         f"Preferences: {json.dumps(prefs_for_prompt, default=str)}"
     )
 
@@ -123,7 +122,7 @@ async def update_user_preferences(
 # ── Conversational preference extraction ──────────────────────────────
 
 # Fields that live on the UserProfile table (not in JSONB)
-_PROFILE_FIELDS = {"gender", "fashion_taste"}
+_PROFILE_FIELDS = {"gender"}
 
 
 async def extract_preferences_from_text(message: str) -> dict:
@@ -141,7 +140,7 @@ async def extract_preferences_from_text(message: str) -> dict:
                     "You are a fashion preference extractor. Given a user message, "
                     "extract any style preferences into a flat JSON object.\n\n"
                     "Possible keys (only include those clearly expressed):\n"
-                    "  gender, fashion_taste, liked_colors (list), disliked_colors (list),\n"
+                    "  gender, liked_colors (list), disliked_colors (list),\n"
                     "  liked_fits (list), preferred_sizes (list), body_type,\n"
                     "  price_sensitivity, height_weight, preferred_shoe_size,\n"
                     "  preferred_bottom_sizes (list).\n\n"

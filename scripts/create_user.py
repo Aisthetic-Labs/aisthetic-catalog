@@ -2,11 +2,11 @@
 Create a UserProfile (+ empty UserPreferences) in a tenant DB for dev testing.
 
 Usage:
-    python -m scripts.create_user <merchant_id> <external_user_id> [--name NAME] [--gender GENDER] [--taste TASTE]
+    python -m scripts.create_user <merchant_id> <external_user_id> [--name NAME] [--gender GENDER]
 
 Examples:
     python -m scripts.create_user 550e8400-e29b-41d4-a716-446655440000 user_42
-    python -m scripts.create_user 550e8400-e29b-41d4-a716-446655440000 user_42 --name "Arjun" --gender male --taste "Minimalist" --dob 1996-04-15
+    python -m scripts.create_user 550e8400-e29b-41d4-a716-446655440000 user_42 --name "Arjun" --gender male --dob 1996-04-15
 """
 
 import argparse
@@ -22,7 +22,6 @@ async def create_user(
     external_user_id: str,
     name: str | None = None,
     gender: str | None = None,
-    fashion_taste: str | None = None,
     dob: str | None = None,
 ):
     SessionLocal = get_tenant_sessionmaker(merchant_id)
@@ -31,7 +30,6 @@ async def create_user(
             external_user_id=external_user_id,
             name=name,
             gender=gender,
-            fashion_taste=fashion_taste,
             dob=date.fromisoformat(dob) if dob else None,
         )
         session.add(profile)
@@ -54,7 +52,6 @@ def main():
     parser.add_argument("external_user_id", help="External user ID")
     parser.add_argument("--name", default=None, help="User's name")
     parser.add_argument("--gender", default=None, help="Gender (male/female/non-binary)")
-    parser.add_argument("--taste", default=None, help="Fashion taste (e.g. Minimalist, Bold & Streetwear)")
     parser.add_argument("--dob", default=None, help="Date of birth (YYYY-MM-DD)")
     args = parser.parse_args()
 
@@ -63,7 +60,6 @@ def main():
         external_user_id=args.external_user_id,
         name=args.name,
         gender=args.gender,
-        fashion_taste=args.taste,
         dob=args.dob,
     ))
 
