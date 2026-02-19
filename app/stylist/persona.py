@@ -118,3 +118,86 @@ async def update_user_preferences(
     res = await session.execute(user_q)
     user = res.scalar_one()
     await summarize_persona(session, user, user_prefs)
+
+
+# ── Conversational preference extraction ──────────────────────────────
+
+# Fields that live on the UserProfile table (not in JSONB)
+_PROFILE_FIELDS = {"gender", "fashion_taste"}
+
+
+async def extract_preferences_from_text(message: str) -> dict:
+    """
+    LLM call that pulls structured preference keys from free-form text.
+    Returns {} when nothing useful can be extracted.
+    """
+    chat_client = get_chat_client()
+    resp = await chat_client.chat.completions.create(
+        model=settings.STYLIST_MODEL_NAME,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a fashion preference extractor. Given a user message, "
+                    "extract any style preferences into a flat JSON object.\n\n"
+                    "Possible keys (only include those clearly expressed):\n"
+                    "  gender, fashion_taste, liked_colors (list), disliked_colors (list),\n"
+                    "  liked_fits (list), preferred_sizes (list), body_type,\n"
+                    "  price_sensitivity, height_weight, preferred_shoe_size,\n"
+                    "  preferred_bottom_sizes (list).\n\n"
+                    "Rules:\n"
+                    "- Only include keys the user explicitly or clearly implies.\n"
+                    "- List values should be JSON arrays of strings.\n"
+                    "- If nothing useful can be extracted, return {}.\n"
+                    "- Output valid JSON only. No markdown, no commentary."
+                ),
+            },
+            {"role": "user", "content": message},
+        ],
+        response_format={"type": "json_object"},
+        max_tokens=300,
+    )
+    raw = resp.choices[0].message.content or "{}"
+    return json.loads(raw)
+
+
+async def apply_extracted_preferences(
+    session: AsyncSession,
+    user_profile: UserProfile,
+    user_prefs: UserPreferences,
+    extracted: dict,
+) -> list[str]:
+    """
+    Split *extracted* data: profile-level fields go to UserProfile columns,
+    everything else goes to UserPreferences JSONB. Re-generates persona.
+
+    Returns a list of human-readable key names that were updated.
+    """
+    if not extracted:
+        return []
+
+    updated_keys: list[str] = []
+
+    # 1) Profile-level columns
+    profile_changed = False
+    for field in _PROFILE_FIELDS:
+        if field in extracted:
+            setattr(user_profile, field, extracted[field])
+            updated_keys.append(field.replace("_", " "))
+            profile_changed = True
+
+    if profile_changed:
+        session.add(user_profile)
+        await session.flush()
+
+    # 2) Preference-level (JSONB)
+    pref_changes = {k: v for k, v in extracted.items() if k not in _PROFILE_FIELDS}
+    if pref_changes:
+        updated_keys.extend(k.replace("_", " ") for k in pref_changes)
+        await update_user_preferences(session, user_prefs, pref_changes)
+
+    # If only profile fields changed, still regenerate persona
+    if profile_changed and not pref_changes:
+        await summarize_persona(session, user_profile, user_prefs)
+
+    return updated_keys

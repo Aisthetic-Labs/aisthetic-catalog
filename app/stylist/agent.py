@@ -17,7 +17,7 @@ async def handle_stylist_chat(
     # Initialize the input state
     initial_state = {
         "merchant_id": merchant_id,
-        "external_user_id": req.external_user_id or "",
+        "external_user_id": req.external_user_id,
         "message": req.message,
         "chat_session_id": chat_session_id,
         "db_session": db_session,

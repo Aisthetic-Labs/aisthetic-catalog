@@ -1,23 +1,44 @@
 from __future__ import annotations
 
-import json
-from datetime import date
-
-from app.core.config import settings
-from app.llm.client import get_chat_client
 from app.logger import logger
 from app.stylist.dto import StylistResponse, QuickReply
 from app.stylist.intents import StylistIntent
-from app.stylist.models_user import UserProfile, UserPreferences
-from app.stylist.persona import summarize_persona
+from app.stylist.persona import (
+    find_user_profile,
+    get_or_create_user_preferences,
+    extract_preferences_from_text,
+    apply_extracted_preferences,
+)
 from app.stylist.session_store import get_session_store
 from app.stylist.state import AgentState
 
-ONBOARDING_COMPLETE_MESSAGE = (
-    "You're all set — I've got your style profile ready.\n\n"
-    "Let's find you something great. Tell me what you're looking for, "
-    "or pick an option below."
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+NOT_REGISTERED_MESSAGE = (
+    "It looks like you don't have an account yet. "
+    "Please register first, and then come back — I'll be ready to style you!"
 )
+
+PREFERENCE_PROMPT = (
+    "I'd love to get to know your style! Tell me a bit about yourself — "
+    "for example, what fits you prefer, colors you like, your usual sizes, "
+    "or your general fashion vibe.\n\n"
+    "You can also skip this and jump straight to shopping."
+)
+
+PREFERENCE_QUICK_REPLIES = [
+    QuickReply(label="Skip", payload={"action": "skip"}),
+    QuickReply(
+        label="I like minimal, neutral tones",
+        payload={"value": "I like minimal, neutral tones"},
+    ),
+    QuickReply(
+        label="Bold streetwear, oversized fits",
+        payload={"value": "Bold streetwear, oversized fits"},
+    ),
+]
 
 WELCOME_QUICK_REPLIES = [
     QuickReply(
@@ -30,341 +51,6 @@ WELCOME_QUICK_REPLIES = [
     ),
 ]
 
-# ---------------------------------------------------------------------------
-# Step definitions (order matters)
-# ---------------------------------------------------------------------------
-
-ONBOARDING_STEPS: list[dict] = [
-    {
-        "key": "awaiting_auth_choice",
-        "next": "name_dob",
-    },
-    {
-        "key": "name_dob",
-        "prompt": (
-            "Let's get you set up! What's your name and date of birth?\n\n"
-            "For example: Arjun, 15 April 1996"
-        ),
-        "quick_replies": [],
-        "next": "gender",
-    },
-    {
-        "key": "gender",
-        "prompt": "What's your gender?",
-        "quick_replies": [
-            QuickReply(label="Male", payload={"value": "male"}),
-            QuickReply(label="Female", payload={"value": "female"}),
-            QuickReply(label="Non-binary", payload={"value": "non-binary"}),
-        ],
-        "next": "fashion_taste",
-    },
-    {
-        "key": "fashion_taste",
-        "prompt": (
-            "How would you describe your fashion taste in one line?\n\n"
-            "Here are some ideas:\n"
-            "- Sophisticated & Refined\n"
-            "- Modern & Trendy\n"
-            "- Distinctive & Artistic\n"
-            "- Curated or Conservative\n"
-            "- Traditional\n"
-            "- Formals\n"
-            "- Minimalist\n"
-            "- Bold & Streetwear\n"
-            "- Casual & Effortless\n\n"
-            "Or describe your own vibe in one line!"
-        ),
-        "quick_replies": [
-            QuickReply(label="Sophisticated & Refined", payload={"value": "Sophisticated & Refined"}),
-            QuickReply(label="Modern & Trendy", payload={"value": "Modern & Trendy"}),
-            QuickReply(label="Distinctive & Artistic", payload={"value": "Distinctive & Artistic"}),
-            QuickReply(label="Minimalist", payload={"value": "Minimalist"}),
-        ],
-        "next": "body_type",
-    },
-    {
-        "key": "body_type",
-        "prompt": "What's your body type?",
-        "quick_replies": [
-            QuickReply(label="Slim", payload={"value": "slim"}),
-            QuickReply(label="Athletic", payload={"value": "athletic"}),
-            QuickReply(label="Average", payload={"value": "average"}),
-            QuickReply(label="Curvy", payload={"value": "curvy"}),
-            QuickReply(label="Plus-size", payload={"value": "plus-size"}),
-        ],
-        "next": "preferred_top_sizes",
-    },
-    {
-        "key": "preferred_top_sizes",
-        "prompt": "What's your usual top / shirt size?",
-        "quick_replies": [
-            QuickReply(label="XS", payload={"value": "XS"}),
-            QuickReply(label="S", payload={"value": "S"}),
-            QuickReply(label="M", payload={"value": "M"}),
-            QuickReply(label="L", payload={"value": "L"}),
-            QuickReply(label="XL", payload={"value": "XL"}),
-            QuickReply(label="XXL", payload={"value": "XXL"}),
-        ],
-        "next": "preferred_bottom_sizes",
-    },
-    {
-        "key": "preferred_bottom_sizes",
-        "prompt": "What's your usual bottom / trouser waist size?",
-        "quick_replies": [
-            QuickReply(label="28", payload={"value": "28"}),
-            QuickReply(label="30", payload={"value": "30"}),
-            QuickReply(label="32", payload={"value": "32"}),
-            QuickReply(label="34", payload={"value": "34"}),
-            QuickReply(label="36", payload={"value": "36"}),
-            QuickReply(label="38", payload={"value": "38"}),
-        ],
-        "next": "height_weight",
-    },
-    # --- Optional steps below ---
-    {
-        "key": "height_weight",
-        "prompt": (
-            "What's your height and weight? This helps us match apparel sizes better.\n\n"
-            "For example: 5'10\", 75 kg"
-        ),
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-        ],
-        "optional": True,
-        "next": "preferred_shoe_size",
-    },
-    {
-        "key": "preferred_shoe_size",
-        "prompt": "What's your shoe size?",
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-            QuickReply(label="UK 6", payload={"value": "UK 6"}),
-            QuickReply(label="UK 7", payload={"value": "UK 7"}),
-            QuickReply(label="UK 8", payload={"value": "UK 8"}),
-            QuickReply(label="UK 9", payload={"value": "UK 9"}),
-            QuickReply(label="UK 10", payload={"value": "UK 10"}),
-            QuickReply(label="UK 11", payload={"value": "UK 11"}),
-        ],
-        "optional": True,
-        "next": "liked_colors",
-    },
-    {
-        "key": "liked_colors",
-        "prompt": "Any colors you gravitate toward? You can pick one or list a few.",
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-            QuickReply(label="Black", payload={"value": "black"}),
-            QuickReply(label="White", payload={"value": "white"}),
-            QuickReply(label="Blue", payload={"value": "blue"}),
-            QuickReply(label="Beige", payload={"value": "beige"}),
-            QuickReply(label="Earth Tones", payload={"value": "earth tones"}),
-            QuickReply(label="Pastels", payload={"value": "pastels"}),
-        ],
-        "optional": True,
-        "next": "disliked_colors",
-    },
-    {
-        "key": "disliked_colors",
-        "prompt": "Any colors you'd rather avoid?",
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-            QuickReply(label="Neon", payload={"value": "neon"}),
-            QuickReply(label="Pink", payload={"value": "pink"}),
-            QuickReply(label="Orange", payload={"value": "orange"}),
-            QuickReply(label="Yellow", payload={"value": "yellow"}),
-            QuickReply(label="None", payload={"value": "none"}),
-        ],
-        "optional": True,
-        "next": "liked_fits",
-    },
-    {
-        "key": "liked_fits",
-        "prompt": "What fits do you usually prefer?",
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-            QuickReply(label="Slim Fit", payload={"value": "slim fit"}),
-            QuickReply(label="Regular", payload={"value": "regular"}),
-            QuickReply(label="Relaxed", payload={"value": "relaxed"}),
-            QuickReply(label="Oversized", payload={"value": "oversized"}),
-        ],
-        "optional": True,
-        "next": "price_sensitivity",
-    },
-    {
-        "key": "price_sensitivity",
-        "prompt": "What's your usual budget range for fashion?",
-        "quick_replies": [
-            QuickReply(label="Skip", payload={"action": "skip"}),
-            QuickReply(label="Budget", payload={"value": "budget"}),
-            QuickReply(label="Mid-range", payload={"value": "mid-range"}),
-            QuickReply(label="Premium", payload={"value": "premium"}),
-            QuickReply(label="No Preference", payload={"value": "no preference"}),
-        ],
-        "optional": True,
-        "next": "_finalize",
-    },
-]
-
-_STEP_INDEX: dict[str, int] = {s["key"]: i for i, s in enumerate(ONBOARDING_STEPS)}
-
-LOGIN_PLACEHOLDER = (
-    "Login via OTP is coming soon! For now, please register to get started."
-)
-
-
-# ---------------------------------------------------------------------------
-# LLM extraction helpers
-# ---------------------------------------------------------------------------
-
-async def _extract_name_dob(message: str) -> dict:
-    """Use LLM to extract name and date of birth from free-text."""
-    chat_client = get_chat_client()
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Extract the user's name and date of birth from the message.\n"
-                    "Return JSON: {\"name\": \"...\", \"dob\": \"YYYY-MM-DD\"}\n"
-                    "If the date of birth is unclear or missing, set dob to null.\n"
-                    "If name is unclear, set name to null.\n"
-                    "Output valid JSON only."
-                ),
-            },
-            {"role": "user", "content": message},
-        ],
-        response_format={"type": "json_object"},
-        max_tokens=100,
-    )
-    raw = resp.choices[0].message.content or "{}"
-    return json.loads(raw)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_MIN_AGE = 13
-_MAX_AGE = 120
-
-
-def _validate_dob(dob_str: str | None) -> date | None:
-    """Return a valid date or None if invalid / out of range."""
-    if not dob_str:
-        return None
-    try:
-        dob = date.fromisoformat(dob_str)
-    except (ValueError, TypeError):
-        return None
-    today = date.today()
-    if dob > today:
-        return None
-    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-    if age < _MIN_AGE or age > _MAX_AGE:
-        return None
-    return dob
-
-
-def _is_skip(message: str) -> bool:
-    return message.strip().lower() == "skip"
-
-
-def _step_config(key: str) -> dict:
-    return ONBOARDING_STEPS[_STEP_INDEX[key]]
-
-
-def _next_step_response(next_key: str, intent: StylistIntent) -> dict:
-    """Build a StylistResponse that asks the question for *next_key*."""
-    cfg = _step_config(next_key)
-    return {
-        "response": StylistResponse(
-            answer=cfg["prompt"],
-            intent=intent,
-            quick_replies=cfg.get("quick_replies", []),
-        ),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Onboarding finalizer
-# ---------------------------------------------------------------------------
-
-async def _finalize_onboarding(state: AgentState, data: dict) -> dict:
-    """Create UserProfile + UserPreferences from collected onboarding data."""
-    db_session = state["db_session"]
-    external_user_id = state["external_user_id"]
-    chat_session_id = state["chat_session_id"]
-
-    dob_value = _validate_dob(data.get("dob"))
-
-    # Create UserProfile
-    profile = UserProfile(
-        external_user_id=external_user_id,
-        name=data.get("name"),
-        dob=dob_value,
-        gender=data.get("gender"),
-        fashion_taste=data.get("fashion_taste"),
-    )
-    db_session.add(profile)
-    await db_session.flush()
-
-    # Build preferences dict from collected data
-    pref_keys = [
-        "body_type", "height_weight", "preferred_top_sizes",
-        "preferred_bottom_sizes", "preferred_shoe_size",
-        "liked_colors", "disliked_colors", "liked_fits",
-        "price_sensitivity",
-    ]
-    prefs_dict: dict = {}
-    for k in pref_keys:
-        v = data.get(k)
-        if v and v.lower() not in ("skip", "none"):
-            prefs_dict[k] = v
-
-    # Map to existing preference key names used by search/persona
-    if "liked_colors" in prefs_dict:
-        prefs_dict["liked_colors"] = _to_list(prefs_dict["liked_colors"])
-    if "disliked_colors" in prefs_dict:
-        val = prefs_dict["disliked_colors"]
-        prefs_dict["disliked_colors"] = _to_list(val)
-    if "liked_fits" in prefs_dict:
-        prefs_dict["liked_fits"] = _to_list(prefs_dict["liked_fits"])
-    if "preferred_top_sizes" in prefs_dict:
-        prefs_dict["preferred_sizes"] = _to_list(prefs_dict.pop("preferred_top_sizes"))
-        # Keep bottom sizes as a separate key
-    if "preferred_bottom_sizes" in prefs_dict:
-        prefs_dict["preferred_bottom_sizes"] = _to_list(prefs_dict["preferred_bottom_sizes"])
-
-    user_prefs = UserPreferences(user_id=profile.id, preferences=prefs_dict)
-    db_session.add(user_prefs)
-    await db_session.flush()
-
-    # Generate initial persona
-    await summarize_persona(db_session, profile, user_prefs)
-
-    # Clear onboarding state from Redis
-    store = get_session_store()
-    await store.clear_onboarding_state(chat_session_id)
-
-    logger.info(f"[Onboarding] Completed for user={external_user_id}")
-
-    return {
-        "response": StylistResponse(
-            answer=ONBOARDING_COMPLETE_MESSAGE,
-            intent=StylistIntent.ONBOARDING,
-            quick_replies=WELCOME_QUICK_REPLIES,
-        ),
-        "user_preferences": user_prefs,
-    }
-
-
-def _to_list(val: str | list) -> list[str]:
-    """Normalize a value to a list of strings."""
-    if isinstance(val, list):
-        return val
-    return [v.strip() for v in val.split(",") if v.strip()]
-
 
 # ---------------------------------------------------------------------------
 # Main node
@@ -372,105 +58,105 @@ def _to_list(val: str | list) -> list[str]:
 
 async def onboarding_node(state: AgentState) -> dict:
     """
-    Multi-step onboarding node. Each invocation handles exactly one step,
-    saves the user's answer to Redis, and returns the next question.
+    Single-step conversational onboarding:
+    - Not registered → tell user to register
+    - awaiting_preferences + skip → clear state, welcome
+    - awaiting_preferences + text → extract & save preferences, welcome
     """
     logger.info("[AgentFlow] Entering onboarding_node")
+    db_session = state["db_session"]
+    external_user_id = state["external_user_id"]
     chat_session_id = state["chat_session_id"]
     message = (state.get("message") or "").strip()
     intent = StylistIntent.ONBOARDING
 
     store = get_session_store()
+    user_preferences = state.get("user_preferences")
+
+    # ── Not registered (no user_preferences passed from initialize) ───
+    if user_preferences is None:
+        # Double-check: maybe profile genuinely doesn't exist
+        user_profile = await find_user_profile(db_session, external_user_id)
+        if user_profile is None:
+            logger.info("[Onboarding] User not registered")
+            return {
+                "response": StylistResponse(
+                    answer=NOT_REGISTERED_MESSAGE,
+                    intent=intent,
+                ),
+            }
+        # Profile exists but preferences weren't in state — fetch them
+        user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
+
+    # ── awaiting_preferences: first visit (no message yet) ────────────
     ob = await store.get_onboarding_state(chat_session_id)
-    step = ob["step"] if ob else "awaiting_auth_choice"
-    data = ob.get("data", {}) if ob else {}
+    step = ob["step"] if ob else None
 
-    # --- Step: awaiting_auth_choice ---
-    if step == "awaiting_auth_choice":
-        if message.lower() in ("login", "log in", "signin", "sign in"):
-            return {
-                "response": StylistResponse(
-                    answer=LOGIN_PLACEHOLDER,
-                    intent=intent,
-                    quick_replies=[
-                        QuickReply(label="Register instead", payload={"action": "register"}),
-                    ],
+    if step == "awaiting_preferences" and not message:
+        return {
+            "response": StylistResponse(
+                answer=PREFERENCE_PROMPT,
+                intent=intent,
+                quick_replies=PREFERENCE_QUICK_REPLIES,
+            ),
+        }
+
+    # ── User skips ────────────────────────────────────────────────────
+    if step == "awaiting_preferences" and message.lower() in ("skip", "skip this"):
+        await store.clear_onboarding_state(chat_session_id)
+        logger.info("[Onboarding] User skipped preferences")
+        return {
+            "response": StylistResponse(
+                answer=(
+                    "No problem! You can always update your preferences later.\n\n"
+                    "What are you shopping for today?"
                 ),
-            }
-        # Treat anything else (including "register") as registration start
-        await store.set_onboarding_state(chat_session_id, "name_dob", data)
-        return _next_step_response("name_dob", intent)
+                intent=intent,
+                quick_replies=WELCOME_QUICK_REPLIES,
+            ),
+        }
 
-    # --- Step: name_dob ---
-    if step == "name_dob":
-        extracted = await _extract_name_dob(message)
-        name = extracted.get("name")
-        dob = _validate_dob(extracted.get("dob"))
+    # ── User provides preference text ─────────────────────────────────
+    if step == "awaiting_preferences" and message:
+        user_profile = await find_user_profile(db_session, external_user_id)
+        extracted = await extract_preferences_from_text(message)
+        updated_keys = await apply_extracted_preferences(
+            db_session, user_profile, user_preferences, extracted,
+        )
 
-        if not name or not dob:
-            # Re-ask with a hint about what's missing
-            parts = []
-            if not name:
-                parts.append("your name")
-            if not dob:
-                parts.append("a valid date of birth")
-            missing = " and ".join(parts)
-            await store.set_onboarding_state(chat_session_id, "name_dob", data)
-            return {
-                "response": StylistResponse(
-                    answer=(
-                        f"I couldn't catch {missing}. Could you try again?\n\n"
-                        "For example: Arjun, 15 April 1996"
-                    ),
-                    intent=intent,
-                ),
-            }
+        await store.clear_onboarding_state(chat_session_id)
 
-        data["name"] = name
-        data["dob"] = dob.isoformat()
-        await store.set_onboarding_state(chat_session_id, "gender", data)
-        return _next_step_response("gender", intent)
-
-    # --- Step: gender ---
-    if step == "gender":
-        data["gender"] = message.lower()
-        await store.set_onboarding_state(chat_session_id, "fashion_taste", data)
-        return _next_step_response("fashion_taste", intent)
-
-    # --- Step: fashion_taste ---
-    if step == "fashion_taste":
-        data["fashion_taste"] = message
-        await store.set_onboarding_state(chat_session_id, "body_type", data)
-        return _next_step_response("body_type", intent)
-
-    # --- Generic handler for body_type through price_sensitivity ---
-    if step in _STEP_INDEX:
-        cfg = _step_config(step)
-        is_optional = cfg.get("optional", False)
-        next_key = cfg["next"]
-
-        if is_optional and _is_skip(message):
-            # Skip — don't save, just advance
-            pass
+        if updated_keys:
+            keys_str = ", ".join(updated_keys)
+            answer = (
+                f"Got it! I've noted your preferences ({keys_str}). "
+                "I'll use these to personalize your recommendations.\n\n"
+                "What are you shopping for today?"
+            )
         else:
-            data[step] = message
+            answer = (
+                "Thanks! I couldn't pick out specific preferences from that, "
+                "but no worries — you can always tell me more later.\n\n"
+                "What are you shopping for today?"
+            )
 
-        if next_key == "_finalize":
-            return await _finalize_onboarding(state, data)
+        logger.info(f"[Onboarding] Preferences saved: {updated_keys}")
+        return {
+            "response": StylistResponse(
+                answer=answer,
+                intent=intent,
+                quick_replies=WELCOME_QUICK_REPLIES,
+            ),
+            "user_preferences": user_preferences,
+        }
 
-        await store.set_onboarding_state(chat_session_id, next_key, data)
-        return _next_step_response(next_key, intent)
-
-    # Fallback: shouldn't happen, but recover gracefully
-    logger.warning(f"[Onboarding] Unknown step '{step}', resetting to awaiting_auth_choice")
-    await store.set_onboarding_state(chat_session_id, "awaiting_auth_choice", {})
+    # ── Fallback (shouldn't happen) ───────────────────────────────────
+    logger.warning(f"[Onboarding] Unexpected state step={step}, message={message!r}")
+    await store.clear_onboarding_state(chat_session_id)
     return {
         "response": StylistResponse(
-            answer="Something went wrong. Let's start over — would you like to register or log in?",
+            answer="Let's get started! What are you shopping for today?",
             intent=intent,
-            quick_replies=[
-                QuickReply(label="Register", payload={"action": "register"}),
-                QuickReply(label="Login", payload={"action": "login"}),
-            ],
+            quick_replies=WELCOME_QUICK_REPLIES,
         ),
     }

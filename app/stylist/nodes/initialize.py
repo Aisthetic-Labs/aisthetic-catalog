@@ -5,7 +5,6 @@ from app.stylist.intents import StylistIntent
 from app.stylist.persona import (
     find_user_profile,
     get_or_create_user_preferences,
-    summarize_persona,
 )
 from app.stylist.session_store import get_session_store
 from app.stylist.shortlist_service import get_shortlist_service
@@ -16,8 +15,8 @@ async def initialize_node(state: AgentState) -> dict:
     Gathers basic context: persona summary, user profile, chat context, and intent.
     This runs at the start of every request.
 
-    If the user is mid-onboarding (or unregistered), short-circuits to ONBOARDING
-    intent so the graph routes to onboarding_node.
+    If the user profile is not found, or persona is empty, routes to ONBOARDING
+    so the graph can handle preference collection (or tell the user to register).
     """
     db_session = state["db_session"]
     external_user_id = state["external_user_id"]
@@ -25,8 +24,9 @@ async def initialize_node(state: AgentState) -> dict:
 
     logger.info(f"[AgentFlow] Entering initialize_node for user={external_user_id}")
 
-    # 0) Check for active onboarding flow
     store = get_session_store()
+
+    # 0) Check for active onboarding flow (e.g. awaiting_preferences)
     onboarding = await store.get_onboarding_state(chat_session_id)
     if onboarding:
         logger.info(f"[AgentFlow] Active onboarding (step={onboarding['step']}), skipping normal init")
@@ -36,13 +36,11 @@ async def initialize_node(state: AgentState) -> dict:
             "shortlist_product_ids": [],
         }
 
-    # 1) Look up user profile (do NOT auto-create)
-    user_profile = await find_user_profile(db_session, external_user_id) if external_user_id else None
+    # 1) Look up user profile — must exist (created during registration)
+    user_profile = await find_user_profile(db_session, external_user_id)
 
     if user_profile is None:
-        # Unregistered user hitting the agent (e.g. Case 2: first call with message)
-        logger.info("[AgentFlow] User not found, routing to onboarding")
-        await store.set_onboarding_state(chat_session_id, step="awaiting_auth_choice")
+        logger.info("[AgentFlow] User not found, routing to onboarding (not registered)")
         return {
             "intent": StylistIntent.ONBOARDING,
             "search_iteration": 0,
@@ -52,9 +50,18 @@ async def initialize_node(state: AgentState) -> dict:
     # 2) Get/Create Preferences
     user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
 
-    # 3) Ensure persona summary exists in preferences
-    if not (user_preferences.preferences or {}).get("persona_summary"):
-        await summarize_persona(db_session, user_profile, user_preferences)
+    # 3) Check persona summary — if empty, ask for preferences
+    persona = (user_preferences.preferences or {}).get("persona_summary")
+    if not persona:
+        logger.info("[AgentFlow] Empty persona, routing to onboarding for preference collection")
+        await store.set_onboarding_state(chat_session_id, step="awaiting_preferences")
+        return {
+            "intent": StylistIntent.ONBOARDING,
+            "user_preferences": user_preferences,
+            "search_iteration": 0,
+            "shortlist_product_ids": [],
+        }
+
     logger.info("[AgentFlow] Persona context ready")
 
     # 4) Build Chat Context Summary (recent history, summarized)
@@ -68,14 +75,14 @@ async def initialize_node(state: AgentState) -> dict:
     shortlist_service = get_shortlist_service()
     shortlist_product_ids = await shortlist_service.get_all(chat_session_id)
 
-    # 5.5) Recall relevant memories from mem0
+    # 6) Recall relevant memories from mem0
     from app.stylist.memory_service import recall_memories
     user_memories = await recall_memories(
         user_id=f"{state['merchant_id']}:{external_user_id}",
         query=state["message"],
     )
 
-    # 6) Detect User Intent (e.g., search, styling, small talk)
+    # 7) Detect User Intent (e.g., search, styling, small talk)
     intent = await detect_intent(state["message"])
     logger.info(f"[AgentFlow] Detected intent: {intent.value}")
 
