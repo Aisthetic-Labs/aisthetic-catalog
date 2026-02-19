@@ -8,6 +8,7 @@ from app.stylist.persona import (
     get_or_create_user_preferences,
     extract_preferences_from_text,
     apply_extracted_preferences,
+    summarize_persona,
 )
 from app.stylist.session_store import get_session_store
 from app.stylist.state import AgentState
@@ -89,6 +90,9 @@ async def preference_collection_node(state: AgentState) -> dict:
     # ── User skips ────────────────────────────────────────────────────
     if step == "awaiting_preferences" and message.lower() in ("skip", "skip this"):
         await store.clear_onboarding_state(chat_session_id)
+        # Generate persona from whatever profile data exists so we don't loop
+        user_profile = await find_user_profile(db_session, external_user_id)
+        await summarize_persona(db_session, user_profile, user_preferences)
         logger.info("[PreferenceCollection] User skipped preferences")
         return {
             "response": StylistResponse(
@@ -112,6 +116,7 @@ async def preference_collection_node(state: AgentState) -> dict:
         await store.clear_onboarding_state(chat_session_id)
 
         if updated_keys:
+            # apply_extracted_preferences already calls summarize_persona
             keys_str = ", ".join(updated_keys)
             answer = (
                 f"Got it! I've noted your preferences ({keys_str}). "
@@ -119,6 +124,8 @@ async def preference_collection_node(state: AgentState) -> dict:
                 "What are you shopping for today?"
             )
         else:
+            # Nothing extracted — still generate persona from existing profile data
+            await summarize_persona(db_session, user_profile, user_preferences)
             answer = (
                 "Thanks! I couldn't pick out specific preferences from that, "
                 "but no worries — you can always tell me more later.\n\n"

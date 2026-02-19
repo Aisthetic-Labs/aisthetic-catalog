@@ -5,6 +5,7 @@ from app.stylist.intents import StylistIntent
 from app.stylist.persona import (
     find_user_profile,
     get_or_create_user_preferences,
+    summarize_persona,
 )
 from app.stylist.session_store import get_session_store
 from app.stylist.shortlist_service import get_shortlist_service
@@ -49,17 +50,27 @@ async def initialize_node(state: AgentState) -> dict:
     # 2) Get/Create Preferences
     user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
 
-    # 3) Check persona summary — if empty, ask for preferences
+    # 3) Ensure persona summary exists
     persona = (user_preferences.preferences or {}).get("persona_summary")
     if not persona:
-        logger.info("[AgentFlow] Empty persona, routing to preference_collection")
-        await store.set_onboarding_state(chat_session_id, step="awaiting_preferences")
-        return {
-            "intent": StylistIntent.PREFERENCE_COLLECTION,
-            "user_preferences": user_preferences,
-            "search_iteration": 0,
-            "shortlist_product_ids": [],
-        }
+        # Check if profile has enough data to generate persona directly
+        has_profile_data = any([user_profile.gender, user_profile.fashion_taste])
+        pref_keys = {k for k in (user_preferences.preferences or {}) if k != "persona_summary"}
+
+        if has_profile_data or pref_keys:
+            # Profile has data from registration — generate persona, skip prompt
+            logger.info("[AgentFlow] Generating persona from existing profile data")
+            await summarize_persona(db_session, user_profile, user_preferences)
+        else:
+            # Truly bare profile — ask for preferences
+            logger.info("[AgentFlow] Empty persona and bare profile, routing to preference_collection")
+            await store.set_onboarding_state(chat_session_id, step="awaiting_preferences")
+            return {
+                "intent": StylistIntent.PREFERENCE_COLLECTION,
+                "user_preferences": user_preferences,
+                "search_iteration": 0,
+                "shortlist_product_ids": [],
+            }
 
     logger.info("[AgentFlow] Persona context ready")
 
