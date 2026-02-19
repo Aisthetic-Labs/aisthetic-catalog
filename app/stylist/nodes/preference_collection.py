@@ -16,11 +16,6 @@ from app.stylist.state import AgentState
 # Constants
 # ---------------------------------------------------------------------------
 
-NOT_REGISTERED_MESSAGE = (
-    "It looks like you don't have an account yet. "
-    "Please register first, and then come back — I'll be ready to style you!"
-)
-
 PREFERENCE_PROMPT = (
     "I'd love to get to know your style! Tell me a bit about yourself — "
     "for example, what fits you prefer, colors you like, your usual sizes, "
@@ -73,19 +68,9 @@ async def preference_collection_node(state: AgentState) -> dict:
     store = get_session_store()
     user_preferences = state.get("user_preferences")
 
-    # ── Not registered (no user_preferences passed from initialize) ───
+    # If preferences weren't passed from initialize, fetch them
     if user_preferences is None:
-        # Double-check: maybe profile genuinely doesn't exist
         user_profile = await find_user_profile(db_session, external_user_id)
-        if user_profile is None:
-            logger.info("[PreferenceCollection] User not registered")
-            return {
-                "response": StylistResponse(
-                    answer=NOT_REGISTERED_MESSAGE,
-                    intent=intent,
-                ),
-            }
-        # Profile exists but preferences weren't in state — fetch them
         user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
 
     # ── awaiting_preferences: first visit (no message yet) ────────────

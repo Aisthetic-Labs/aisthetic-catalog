@@ -5,6 +5,7 @@ from app.core.tenant_db import get_tenant_sessionmaker
 from app.logger import logger
 from app.stylist.agent import handle_stylist_chat
 from app.stylist.dto import StylistResponse, QuickReply, StylistChatRequest
+from app.stylist.persona import find_user_profile
 from app.stylist.session_store import get_session_store
 
 router = APIRouter(
@@ -49,8 +50,17 @@ async def stylist_chat(
             detail="message is required when chat_session_id is provided",
         )
 
-    # No session_id → create new session
+    # No session_id → validate user, then create new session
     if not has_session:
+        SessionLocal = get_tenant_sessionmaker(str(merchant_id))
+        async with SessionLocal() as db_session:
+            profile = await find_user_profile(db_session, req.external_user_id)
+        if profile is None:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found. Please register first.",
+            )
+
         chat_session_id, _ = await store.create_session(
             merchant_id=str(merchant_id),
             external_user_id=req.external_user_id,

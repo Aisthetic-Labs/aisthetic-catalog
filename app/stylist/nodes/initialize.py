@@ -37,16 +37,14 @@ async def initialize_node(state: AgentState) -> dict:
             "shortlist_product_ids": [],
         }
 
-    # 1) Look up user profile — must exist (created during registration)
+    # 1) Look up user profile — must exist (validated in route handler)
     user_profile = await find_user_profile(db_session, external_user_id)
 
     if user_profile is None:
-        logger.info("[AgentFlow] User not found, routing to preference_collection (not registered)")
-        return {
-            "intent": StylistIntent.PREFERENCE_COLLECTION,
-            "search_iteration": 0,
-            "shortlist_product_ids": [],
-        }
+        # Should never happen — route handler validates before session creation.
+        # Defensive guard only.
+        logger.error(f"[AgentFlow] User {external_user_id} not found despite route validation")
+        raise ValueError(f"User profile not found for external_user_id={external_user_id}")
 
     # 2) Get/Create Preferences
     user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
