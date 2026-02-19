@@ -4,7 +4,13 @@ from uuid import UUID
 from app.core.tenant_db import get_tenant_sessionmaker
 from app.logger import logger
 from app.stylist.agent import handle_stylist_chat
-from app.stylist.dto import StylistResponse, QuickReply, StylistChatRequest
+from app.stylist.constants import (
+    WELCOME_MESSAGE,
+    WELCOME_QUICK_REPLIES,
+    PREFERENCE_WELCOME_MESSAGE,
+    PREFERENCE_QUICK_REPLIES,
+)
+from app.stylist.dto import StylistResponse, StylistChatRequest
 from app.stylist.persona import find_user_profile, get_or_create_user_preferences
 from app.stylist.session_store import get_session_store
 
@@ -12,48 +18,6 @@ router = APIRouter(
     prefix="/merchants/{merchant_id}/stylist",
     tags=["stylist"],
 )
-
-WELCOME_MESSAGE = (
-    "Welcome! I'm here to help you find exactly what you're looking for \U0001f44b\n\n"
-    "I can help you:\n"
-    "- Find outfits for any occasion — weddings, dates, office, travel\n"
-    "- Compare and decide between options\n"
-    "- Discover pieces that match your style\n\n"
-    "What are you shopping for today?"
-)
-
-WELCOME_QUICK_REPLIES = [
-    QuickReply(
-        label="Style me for an occasion",
-        payload={"suggested_intent": "occasion_styling"},
-    ),
-    QuickReply(
-        label="Recommend shirts for me",
-        payload={"suggested_intent": "direct_product_search", "query": "shirt"},
-    ),
-]
-
-PREFERENCE_WELCOME_MESSAGE = (
-    "Welcome! Before we start shopping, I'd love to learn about your style \U0001f3a8\n\n"
-    "Tell me about your preferences — favorite colors, fits, sizes, or anything "
-    "that helps me personalize your experience.\n\n"
-    "Or just skip and dive straight into shopping!"
-)
-
-PREFERENCE_QUICK_REPLIES = [
-    QuickReply(
-        label="Skip",
-        payload={"action": "skip_preferences"},
-    ),
-    QuickReply(
-        label="I like casual & streetwear",
-        payload={"action": "preference_text", "text": "I like casual and streetwear styles"},
-    ),
-    QuickReply(
-        label="I prefer minimal & classic",
-        payload={"action": "preference_text", "text": "I prefer minimal and classic styles"},
-    ),
-]
 
 
 @router.post("/chat", response_model=StylistResponse)
@@ -83,12 +47,10 @@ async def stylist_chat(
                     detail="User not found. Please register first.",
                 )
 
-            # Check if bare user (no persona yet) — only when no message
-            is_bare_user = False
-            if not has_message:
-                user_prefs = await get_or_create_user_preferences(db_session, profile.id)
-                persona = (user_prefs.preferences or {}).get("persona_summary")
-                is_bare_user = not persona
+            # Check if bare user (no persona yet)
+            user_prefs = await get_or_create_user_preferences(db_session, profile.id)
+            persona = (user_prefs.preferences or {}).get("persona_summary")
+            is_bare_user = not persona
 
         welcome_msg = PREFERENCE_WELCOME_MESSAGE if is_bare_user else WELCOME_MESSAGE
         chat_session_id, _ = await store.create_session(

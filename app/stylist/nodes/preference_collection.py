@@ -5,7 +5,8 @@ import json
 from app.core.config import settings
 from app.llm.client import get_chat_client
 from app.logger import logger
-from app.stylist.dto import StylistResponse, QuickReply
+from app.stylist.constants import WELCOME_MESSAGE, WELCOME_QUICK_REPLIES
+from app.stylist.dto import StylistResponse
 from app.stylist.intents import StylistIntent
 from app.stylist.persona import (
     find_user_profile,
@@ -15,22 +16,6 @@ from app.stylist.persona import (
     summarize_persona,
 )
 from app.stylist.state import AgentState
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-WELCOME_QUICK_REPLIES = [
-    QuickReply(
-        label="Style me for an occasion",
-        payload={"suggested_intent": "occasion_styling"},
-    ),
-    QuickReply(
-        label="Recommend shirts for me",
-        payload={"suggested_intent": "direct_product_search", "query": "shirt"},
-    ),
-]
-
 
 # ---------------------------------------------------------------------------
 # LLM classification
@@ -106,10 +91,7 @@ async def preference_collection_node(state: AgentState) -> dict:
         logger.info("[PreferenceCollection] User skipped preferences")
         return {
             "response": StylistResponse(
-                answer=(
-                    "No problem! You can always update your preferences later.\n\n"
-                    "What are you shopping for today?"
-                ),
+                answer="No problem! You can always update your preferences later.\n\n" + WELCOME_MESSAGE,
                 intent=intent,
                 quick_replies=WELCOME_QUICK_REPLIES,
             ),
@@ -121,10 +103,7 @@ async def preference_collection_node(state: AgentState) -> dict:
         logger.info("[PreferenceCollection] Non-preference message, generating persona and moving on")
         return {
             "response": StylistResponse(
-                answer=(
-                    "Sure, let's get started! You can share style preferences anytime.\n\n"
-                    "What are you shopping for today?"
-                ),
+                answer="Sure, let's get started!\n\n" + WELCOME_MESSAGE,
                 intent=intent,
                 quick_replies=WELCOME_QUICK_REPLIES,
             ),
@@ -138,18 +117,10 @@ async def preference_collection_node(state: AgentState) -> dict:
 
     if updated_keys:
         keys_str = ", ".join(updated_keys)
-        answer = (
-            f"Got it! I've noted your preferences ({keys_str}). "
-            "I'll use these to personalize your recommendations.\n\n"
-            "What are you shopping for today?"
-        )
+        answer = f"Got it! I've noted your preferences ({keys_str}).\n\n" + WELCOME_MESSAGE
     else:
         await summarize_persona(db_session, user_profile, user_preferences)
-        answer = (
-            "Thanks! I couldn't pick out specific preferences from that, "
-            "but no worries — you can always tell me more later.\n\n"
-            "What are you shopping for today?"
-        )
+        answer = "Thanks for sharing! I'll use context as we shop.\n\n" + WELCOME_MESSAGE
 
     logger.info(f"[PreferenceCollection] Preferences saved: {updated_keys}")
     return {
