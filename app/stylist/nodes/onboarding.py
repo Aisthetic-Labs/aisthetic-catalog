@@ -280,7 +280,6 @@ def _next_step_response(next_key: str, intent: StylistIntent) -> dict:
     return {
         "response": StylistResponse(
             answer=cfg["prompt"],
-            recommended_product_ids=[],
             intent=intent,
             quick_replies=cfg.get("quick_replies", []),
         ),
@@ -353,7 +352,6 @@ async def _finalize_onboarding(state: AgentState, data: dict) -> dict:
     return {
         "response": StylistResponse(
             answer=ONBOARDING_COMPLETE_MESSAGE,
-            recommended_product_ids=[],
             intent=StylistIntent.ONBOARDING,
             quick_replies=WELCOME_QUICK_REPLIES,
         ),
@@ -393,7 +391,6 @@ async def onboarding_node(state: AgentState) -> dict:
             return {
                 "response": StylistResponse(
                     answer=LOGIN_PLACEHOLDER,
-                    recommended_product_ids=[],
                     intent=intent,
                     quick_replies=[
                         QuickReply(label="Register instead", payload={"action": "register"}),
@@ -425,7 +422,6 @@ async def onboarding_node(state: AgentState) -> dict:
                         f"I couldn't catch {missing}. Could you try again?\n\n"
                         "For example: Arjun, 15 April 1996"
                     ),
-                    recommended_product_ids=[],
                     intent=intent,
                 ),
             }
@@ -471,7 +467,6 @@ async def onboarding_node(state: AgentState) -> dict:
     return {
         "response": StylistResponse(
             answer="Something went wrong. Let's start over — would you like to register or log in?",
-            recommended_product_ids=[],
             intent=intent,
             quick_replies=[
                 QuickReply(label="Register", payload={"action": "register"}),

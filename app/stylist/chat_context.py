@@ -81,7 +81,7 @@ class ChatContextSummarizer:
         }
 
         recommended_ids = [
-            str(pid) for pid in (stylist_response.recommended_product_ids or [])
+            str(p.product_id) for p in (stylist_response.recommended_products or [])
         ]
         if recommended_ids:
             assistant_entry["recommended_product_ids"] = recommended_ids[

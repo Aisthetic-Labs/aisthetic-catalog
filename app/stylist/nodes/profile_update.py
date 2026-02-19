@@ -20,7 +20,6 @@ async def profile_update_node(state: AgentState) -> dict:
 
     response = StylistResponse(
         answer=answer,
-        recommended_product_ids=[],
         intent=state["intent"],
     )
     return {"response": response}

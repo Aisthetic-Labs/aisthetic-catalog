@@ -33,7 +33,6 @@ async def small_talk_node(state: AgentState) -> dict:
 
     response = StylistResponse(
         answer=answer,
-        recommended_product_ids=[],
         intent=intent,
     )
     return {"response": response}

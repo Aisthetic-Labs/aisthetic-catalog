@@ -37,7 +37,6 @@ async def occasion_styling_node(state: AgentState) -> dict:
         return {
             "response": StylistResponse(
                 answer="What occasion are you dressing up for?",
-                recommended_product_ids=[],
                 intent=StylistIntent.OCCASION_STYLING,
                 quick_replies=OCCASION_QUICK_REPLIES,
             ),

@@ -52,12 +52,9 @@ def _assemble_response(
     if closing:
         answer_parts.append(closing)
 
-    rec_ids = [rp.product_id for rp in recommended_products]
-
     return StylistResponse(
         answer="\n".join(answer_parts).strip(),
         recommended_products=recommended_products,
-        recommended_product_ids=rec_ids,
         shortlisted_product_ids=[UUID(pid) for pid in shortlist_ids],
         intent=intent,
     )

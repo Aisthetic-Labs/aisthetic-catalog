@@ -17,12 +17,6 @@ class StylistChatRequest(BaseModel):
     occasion: Optional[str] = None
 
 
-class ChatTurn(BaseModel):
-    role: str  # "user" or "assistant"
-    message: str
-    recommended_product_ids: Optional[List[UUID]] = None
-
-
 class ProductRecommendation(BaseModel):
     product_id: UUID
     title: str
@@ -38,7 +32,6 @@ class StylistResponse(BaseModel):
     chat_session_id: str = ""
     answer: str
     recommended_products: List[ProductRecommendation] = []
-    recommended_product_ids: List[UUID] = []
     shortlisted_product_ids: List[UUID] = []
     cart_product_ids: List[UUID] = []          # future, always empty for now
     intent: Optional[StylistIntent] = None
