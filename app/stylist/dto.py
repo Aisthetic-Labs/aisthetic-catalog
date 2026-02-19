@@ -23,9 +23,21 @@ class ChatTurn(BaseModel):
     recommended_product_ids: Optional[List[UUID]] = None
 
 
+class ProductRecommendation(BaseModel):
+    product_id: UUID
+    title: str
+    brand: Optional[str] = None
+    price: float
+    currency: str = "INR"
+    image_url: Optional[str] = None
+    color: Optional[str] = None
+    reason: str
+
+
 class StylistResponse(BaseModel):
     chat_session_id: str = ""
     answer: str
+    recommended_products: List[ProductRecommendation] = []
     recommended_product_ids: List[UUID] = []
     shortlisted_product_ids: List[UUID] = []
     cart_product_ids: List[UUID] = []          # future, always empty for now

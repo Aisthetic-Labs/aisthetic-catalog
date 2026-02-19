@@ -44,22 +44,13 @@ def _serialize_product_for_prompt(p: Product, available_sizes: list[str] | None 
 
 
 def _filters_from_completed_query(cq: CompletedStylistQuery) -> CatalogFilter:
-    price_min = cq.price_min
-    price_max = cq.price_max
-
-    color = cq.colors[0] if cq.colors else None
-    gender = cq.gender
-    category = cq.garment_types[0] if cq.garment_types else None
-
-    sizes = cq.sizes if cq.sizes else None
-
     return CatalogFilter(
-        category=category,
-        color=[color] if color else None,
-        gender=gender,
-        price_min=price_min,
-        price_max=price_max,
-        sizes=sizes,
+        category=cq.garment_types if cq.garment_types else None,
+        color=cq.colors if cq.colors else None,
+        gender=cq.gender,
+        price_min=cq.price_min,
+        price_max=cq.price_max,
+        sizes=cq.sizes if cq.sizes else None,
     )
 
 
@@ -77,7 +68,7 @@ async def _search_and_load_products(
     filters = _filters_from_completed_query(completed_query)
 
     if search_iteration > 0:
-        filters.color = []
+        filters.color = None
         filters.category = None
 
     search_req = CatalogSearchRequest(
@@ -93,5 +84,11 @@ async def _search_and_load_products(
     ids = [UUID(h["product_id"]) for h in hits]
 
     sizes_by_id = {h["product_id"]: h.get("available_sizes", []) for h in hits}
+    image_by_id = {h["product_id"]: h.get("image_url") for h in hits}
     products = await _load_products_by_ids(db_session, ids)
-    return [_serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id))) for p in products]
+    serialized = []
+    for p in products:
+        s = _serialize_product_for_prompt(p, available_sizes=sizes_by_id.get(str(p.id)))
+        s["image_url"] = image_by_id.get(str(p.id))
+        serialized.append(s)
+    return serialized

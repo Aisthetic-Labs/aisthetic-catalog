@@ -6,28 +6,17 @@ from app.catalog.embeddings import embed_text, embed_image_from_url
 from app.logger import logger
 
 
-def _build_filter_clauses(filters, user_persona: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
+def _build_filter_clauses(filters) -> List[Dict[str, Any]]:
+    """Build hard filter clauses from explicit user filters only (no persona)."""
     clauses = []
-    
-    # 1) Category (from explicit filters)
-    if filters.category:
-        clauses.append({"term": {"category": filters.category}})
 
-    # 2) Color (explicit filter OR persona preferred, minus avoid)
-    final_colors = filters.color or []
-    if not final_colors and user_persona and user_persona.get("preferred_colors"):
-        # Respect ordering: preferred_colors is already ordered by user preference
-        final_colors = user_persona["preferred_colors"]
-    
-    if final_colors:
-        # If we have avoid_colors, remove them from the list if they were added via persona
-        avoid_colors = user_persona.get("avoid_colors", []) if user_persona else []
-        final_colors = [c for c in final_colors if c not in avoid_colors]
-        if final_colors:
-            clauses.append({"terms": {"color_primary": final_colors}})
-    elif user_persona and user_persona.get("avoid_colors"):
-        # Even if no preferred color, we should avoid specific ones
-        clauses.append({"bool": {"must_not": {"terms": {"color_primary": user_persona["avoid_colors"]}}}})
+    # 1) Category (explicit)
+    if filters.category:
+        clauses.append({"terms": {"category": filters.category}})
+
+    # 2) Color (explicit from user query only)
+    if filters.color:
+        clauses.append({"terms": {"color_primary": filters.color}})
 
     # 3) Gender
     if filters.gender:
@@ -46,21 +35,27 @@ def _build_filter_clauses(filters, user_persona: Dict[str, Any] | None = None) -
     if not filters.include_out_of_stock:
         clauses.append({"term": {"has_stock": True}})
 
-    # 6) Size filter (explicit or from persona)
-    size_filter = filters.sizes or []
-    if not size_filter and user_persona and user_persona.get("preferred_sizes"):
-        size_filter = user_persona["preferred_sizes"]
-    if size_filter:
-        clauses.append({"terms": {"available_sizes": size_filter}})
-
-    # 7) Fits and Style Vibes (from persona)
-    if user_persona:
-        if user_persona.get("preferred_fits"):
-            clauses.append({"terms": {"fit": user_persona["preferred_fits"]}})
-        if user_persona.get("style_vibes"):
-            clauses.append({"terms": {"style_tags": user_persona["style_vibes"]}})
+    # 6) Size filter (explicit from user query only)
+    if filters.sizes:
+        clauses.append({"terms": {"available_sizes": filters.sizes}})
 
     return clauses
+
+
+def _build_persona_query_boost(user_persona: dict | None) -> str:
+    """Build a text suffix from persona preferences for semantic ranking."""
+    if not user_persona:
+        return ""
+    parts = []
+    if user_persona.get("preferred_colors"):
+        parts.append(f"preferred colors: {', '.join(user_persona['preferred_colors'])}")
+    if user_persona.get("preferred_fits"):
+        parts.append(f"preferred fit: {', '.join(user_persona['preferred_fits'])}")
+    if user_persona.get("style_vibes"):
+        parts.append(f"style: {', '.join(user_persona['style_vibes'])}")
+    if user_persona.get("preferred_sizes"):
+        parts.append(f"sizes: {', '.join(user_persona['preferred_sizes'])}")
+    return "; ".join(parts)
 
 
 def _build_search_body(
@@ -107,34 +102,41 @@ async def search_products(
     if not client.indices.exists(index=index_name):
         return []
 
+    # Enrich query with persona preferences for soft semantic ranking
     query_text = req.query_text
-    query_vector = await embed_text(query_text) if query_text else None
+    persona_boost = _build_persona_query_boost(req.user_persona)
+    enriched_query = f"{query_text} — {persona_boost}" if query_text and persona_boost else query_text
+    query_vector = await embed_text(enriched_query) if enriched_query else None
 
-    # Build must_not for excluded product IDs
-    must_not_clauses: List[Dict[str, Any]] | None = None
+    # Build must_not for excluded product IDs + avoid_colors
+    must_not_clauses: List[Dict[str, Any]] = []
     if req.excluded_product_ids:
-        must_not_clauses = [{"ids": {"values": req.excluded_product_ids}}]
+        must_not_clauses.append({"ids": {"values": req.excluded_product_ids}})
+    if req.user_persona and req.user_persona.get("avoid_colors"):
+        must_not_clauses.append({"terms": {"color_primary": req.user_persona["avoid_colors"]}})
 
-    # Try with persona filters first
-    filter_clauses = _build_filter_clauses(req.filters, req.user_persona)
+    effective_must_not = must_not_clauses or None
+
+    # Primary search with hard filters only (persona is in query embedding)
+    filter_clauses = _build_filter_clauses(req.filters)
     logger.info(f"[Search] Built filters: {filter_clauses}")
-    body = _build_search_body(filter_clauses, req.limit, query_vector, must_not_clauses)
+    body = _build_search_body(filter_clauses, req.limit, query_vector, effective_must_not)
     res = client.search(index=index_name, body=body)
 
-    # Fallback 1: drop persona filters
-    if _hit_count(res) == 0 and req.user_persona:
-        logger.info("[Search] No results with persona filters, falling back to basic filters")
-        basic_filters = _build_filter_clauses(req.filters, None)
-        body = _build_search_body(basic_filters, req.limit, query_vector, must_not_clauses)
-        res = client.search(index=index_name, body=body)
-
-    # Fallback 2: also drop size filter
-    has_sizes = req.filters.sizes or (req.user_persona and req.user_persona.get("preferred_sizes"))
-    if _hit_count(res) == 0 and has_sizes:
+    # Fallback 1: drop size filter
+    if _hit_count(res) == 0 and req.filters.sizes:
         logger.info("[Search] No results with size filter, falling back without size constraint")
         relaxed_filters = req.filters.model_copy(update={"sizes": None})
-        size_relaxed_clauses = _build_filter_clauses(relaxed_filters, None)
-        body = _build_search_body(size_relaxed_clauses, req.limit, query_vector, must_not_clauses)
+        size_relaxed_clauses = _build_filter_clauses(relaxed_filters)
+        body = _build_search_body(size_relaxed_clauses, req.limit, query_vector, effective_must_not)
+        res = client.search(index=index_name, body=body)
+
+    # Fallback 2: also drop category filter
+    if _hit_count(res) == 0 and req.filters.category:
+        logger.info("[Search] No results with category filter, falling back without category")
+        relaxed_filters = req.filters.model_copy(update={"sizes": None, "category": None})
+        cat_relaxed_clauses = _build_filter_clauses(relaxed_filters)
+        body = _build_search_body(cat_relaxed_clauses, req.limit, query_vector, effective_must_not)
         res = client.search(index=index_name, body=body)
 
     hits = res.get("hits", {}).get("hits", [])
@@ -149,6 +151,8 @@ async def search_products(
                 "price": src["price"],
                 "currency": src["currency"],
                 "image_url": src.get("image_url"),
+                "color": src.get("color_primary"),
+                "brand": src.get("brand"),
                 "available_sizes": src.get("available_sizes", []),
             }
         )
@@ -178,7 +182,7 @@ async def search_products_by_image(
     filter_clauses: List[Dict[str, Any]] = []
 
     if req.filters.category:
-        filter_clauses.append({"term": {"category": req.filters.category}})
+        filter_clauses.append({"terms": {"category": req.filters.category}})
 
     if req.filters.color:
         filter_clauses.append({"terms": {"color_primary": req.filters.color}})

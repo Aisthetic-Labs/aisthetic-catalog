@@ -26,7 +26,7 @@ class MerchantProductIn(BaseModel):
 
 
 class CatalogFilter(BaseModel):
-    category: Optional[str] = None
+    category: Optional[List[str]] = None
     color: Optional[List[str]] = None
     gender: Optional[str] = None
     price_min: Optional[float] = None
