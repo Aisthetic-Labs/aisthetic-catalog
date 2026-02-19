@@ -1,8 +1,5 @@
-from sqlalchemy import select
-
 from app.logger import logger
 from app.stylist.dto import StylistResponse
-from app.stylist.models_user import UserProfile
 from app.stylist.persona import extract_preferences_from_text, apply_extracted_preferences
 from app.stylist.state import AgentState
 
@@ -17,14 +14,9 @@ async def profile_update_node(state: AgentState) -> dict:
     user_preferences = state["user_preferences"]
     message = state["message"]
 
-    # Look up the UserProfile from the preferences' user_id
-    user_q = select(UserProfile).where(UserProfile.id == user_preferences.user_id)
-    res = await db_session.execute(user_q)
-    user_profile = res.scalar_one()
-
     extracted = await extract_preferences_from_text(message)
     updated_keys = await apply_extracted_preferences(
-        db_session, user_profile, user_preferences, extracted,
+        db_session, user_preferences, extracted,
     )
 
     if updated_keys:
