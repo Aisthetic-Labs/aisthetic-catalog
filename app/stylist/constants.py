@@ -1,12 +1,12 @@
 from app.stylist.dto import QuickReply
 
 WELCOME_MESSAGE = (
-    "Welcome! I'm here to help you find exactly what you're looking for and make it fun \U0001f44b\n\n"
-    "I can help you:\n"
-    "- Find outfits for any occasion — weddings, dates, office, travel, casual\n"
-    "- Discover pieces that match your daily style\n"
-    "- Compare and decide between options\n\n"
-    "What are you shopping for today?"
+    "Hey! I'm your personal stylist \U0001f44b\n\n"
+    "Here's what I can do for you:\n"
+    "- Put together outfits for any occasion — weddings, dates, office, travel, you name it\n"
+    "- Find pieces that match your personal style\n"
+    "- Help you compare options and make up your mind\n\n"
+    "So, what are we shopping for today?"
 )
 
 WELCOME_QUICK_REPLIES = [
