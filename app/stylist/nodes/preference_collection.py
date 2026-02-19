@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+from app.core.config import settings
+from app.llm.client import get_chat_client
 from app.logger import logger
 from app.stylist.dto import StylistResponse, QuickReply
 from app.stylist.intents import StylistIntent
@@ -29,6 +33,45 @@ WELCOME_QUICK_REPLIES = [
 
 
 # ---------------------------------------------------------------------------
+# LLM classification
+# ---------------------------------------------------------------------------
+
+_CLASSIFY_PROMPT = """\
+You are classifying a user's response to a style-preference prompt.
+The user was asked to share fashion preferences (colors, fits, sizes, style).
+
+Classify the message into exactly ONE category:
+- "preferences": The user is sharing style preferences, fashion tastes, or clothing details.
+- "skip": The user wants to skip preference sharing (e.g. "no thanks", "skip", "nah", "let's just shop").
+- "other": The user is asking a product question, greeting, or anything unrelated to sharing preferences.
+
+User message: {message}
+
+Return ONLY a JSON object: {{"category": "<preferences|skip|other>"}}
+"""
+
+
+async def _classify_preference_response(message: str) -> str:
+    """Classify whether the user message is preferences, skip, or other."""
+    chat_client = get_chat_client()
+    resp = await chat_client.chat.completions.create(
+        model=settings.STYLIST_MODEL_NAME,
+        messages=[
+            {"role": "system", "content": "Classify user responses to a preference prompt."},
+            {"role": "user", "content": _CLASSIFY_PROMPT.format(message=message)},
+        ],
+        response_format={"type": "json_object"},
+        max_tokens=50,
+    )
+    raw = resp.choices[0].message.content or "{}"
+    data = json.loads(raw)
+    category = data.get("category", "other")
+    if category not in ("preferences", "skip", "other"):
+        return "other"
+    return category
+
+
+# ---------------------------------------------------------------------------
 # Main node
 # ---------------------------------------------------------------------------
 
@@ -36,8 +79,7 @@ async def preference_collection_node(state: AgentState) -> dict:
     """
     Stateless single-step preference collection.
     Always receives a message (route handler guarantees this).
-    - skip → generate persona from existing data, welcome
-    - text  → extract & save preferences, generate persona, welcome
+    Uses LLM to classify the response into: preferences, skip, or other.
     """
     logger.info("[AgentFlow] Entering preference_collection_node")
     db_session = state["db_session"]
@@ -52,9 +94,14 @@ async def preference_collection_node(state: AgentState) -> dict:
         user_profile = await find_user_profile(db_session, external_user_id)
         user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
 
-    # ── User skips ────────────────────────────────────────────────────
-    if message.lower() in ("skip", "skip this"):
-        user_profile = await find_user_profile(db_session, external_user_id)
+    # Classify the user's response
+    category = await _classify_preference_response(message)
+    logger.info(f"[PreferenceCollection] Classified response as: {category}")
+
+    user_profile = await find_user_profile(db_session, external_user_id)
+
+    # ── skip: user wants to skip preference sharing ───────────────────
+    if category == "skip":
         await summarize_persona(db_session, user_profile, user_preferences)
         logger.info("[PreferenceCollection] User skipped preferences")
         return {
@@ -68,15 +115,28 @@ async def preference_collection_node(state: AgentState) -> dict:
             ),
         }
 
-    # ── User provides preference text ─────────────────────────────────
-    user_profile = await find_user_profile(db_session, external_user_id)
+    # ── other: product query, greeting, etc. ──────────────────────────
+    if category == "other":
+        await summarize_persona(db_session, user_profile, user_preferences)
+        logger.info("[PreferenceCollection] Non-preference message, generating persona and moving on")
+        return {
+            "response": StylistResponse(
+                answer=(
+                    "Sure, let's get started! You can share style preferences anytime.\n\n"
+                    "What are you shopping for today?"
+                ),
+                intent=intent,
+                quick_replies=WELCOME_QUICK_REPLIES,
+            ),
+        }
+
+    # ── preferences: extract, apply, and generate persona ─────────────
     extracted = await extract_preferences_from_text(message)
     updated_keys = await apply_extracted_preferences(
         db_session, user_profile, user_preferences, extracted,
     )
 
     if updated_keys:
-        # apply_extracted_preferences already calls summarize_persona
         keys_str = ", ".join(updated_keys)
         answer = (
             f"Got it! I've noted your preferences ({keys_str}). "
@@ -84,7 +144,6 @@ async def preference_collection_node(state: AgentState) -> dict:
             "What are you shopping for today?"
         )
     else:
-        # Nothing extracted — still generate persona from existing profile data
         await summarize_persona(db_session, user_profile, user_preferences)
         answer = (
             "Thanks! I couldn't pick out specific preferences from that, "
