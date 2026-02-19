@@ -52,10 +52,6 @@ def _assemble_response(
     if closing:
         answer_parts.append(closing)
 
-    # Add shortlist nudge when recommending
-    if recommended_products:
-        answer_parts.append("\nSave any you like to your shortlist, or ask me to refine!")
-
     rec_ids = [rp.product_id for rp in recommended_products]
 
     return StylistResponse(
@@ -108,7 +104,9 @@ async def generate_response_node(state: AgentState) -> dict:
         "- Recommend only from the candidate_products list. Never invent products.\n"
         "- Avoid recommending products already in the customer's shortlist.\n"
         "- If nothing fits well, say so honestly in 'opening' and set recommendations to [].\n"
-        "- If the request is ambiguous or lacks detail, ask a clarifying question in 'opening' and set recommendations to [].\n\n"
+        "- If the request is ambiguous or lacks detail, ask a clarifying question in 'opening' and set recommendations to [].\n"
+        "- When recommending products, use 'closing' to naturally invite the customer to save favorites to their shortlist or ask you to refine. Keep it conversational — never robotic or templated.\n"
+        "- When NOT recommending (clarification, empty list), 'closing' can be null or a brief conversational sign-off.\n\n"
 
         "Context usage:\n"
         "- All conversational context is provided via chat_context. Treat chat_context.current_user_message as the canonical ask; use conversation_window to stay consistent, follow up naturally, and avoid repeating products.\n"
