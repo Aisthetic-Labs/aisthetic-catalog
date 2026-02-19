@@ -20,6 +20,10 @@ WELCOME_QUICK_REPLIES = [
     ),
 ]
 
+POST_PREFERENCE_MESSAGE = (
+    "So, what are we shopping for today?"
+)
+
 PREFERENCE_WELCOME_MESSAGE = (
     "Welcome! Before we start shopping, I'd love to learn about your style \U0001f3a8\n\n"
     "Tell me about your preferences — favorite colors, fits, sizes, or anything "

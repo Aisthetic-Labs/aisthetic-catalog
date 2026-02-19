@@ -1,7 +1,6 @@
 import json
 from uuid import UUID
-from app.core.config import settings
-from app.llm.client import get_chat_client
+from app.llm.client import chat_complete
 from app.logger import logger
 from app.stylist.dto import StylistResponse, ProductRecommendation
 from app.stylist.intents import StylistIntent
@@ -129,9 +128,7 @@ async def generate_response_node(state: AgentState) -> dict:
         "trend_context": state.get("trend_context"),
     }
 
-    chat_client = get_chat_client()
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    content = await chat_complete(
         messages=[
             {"role": "system", "content": system_prompt},
             {
@@ -145,11 +142,9 @@ async def generate_response_node(state: AgentState) -> dict:
                 ),
             },
         ],
-        response_format={"type": "json_object"},
         max_tokens=1024,
+        json_mode=True,
     )
-
-    content = resp.choices[0].message.content
     parsed = json.loads(content)
 
     response = _assemble_response(parsed, candidate_products, shortlist_ids, intent)

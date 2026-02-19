@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     REPLICATE_IMAGE_EMBEDDING_MODEL: str = Field(default="openai/clip")
 
     STYLIST_MODEL_NAME: str = Field(default="gpt-4.1-mini")
+    STYLIST_PROVIDER: str = Field(default="openai")   # "openai" or "anthropic"
+    ANTHROPIC_API_KEY: str = Field(default="")
 
     # Catalog defaults
     INCLUDE_OUT_OF_STOCK: bool = Field(default=False)

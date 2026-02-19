@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 
-from app.core.config import settings
-from app.llm.client import get_chat_client
+from app.llm.client import chat_complete
 from app.logger import logger
-from app.stylist.constants import WELCOME_MESSAGE, WELCOME_QUICK_REPLIES
+from app.stylist.constants import POST_PREFERENCE_MESSAGE, WELCOME_QUICK_REPLIES
 from app.stylist.dto import StylistResponse
 from app.stylist.intents import StylistIntent
 from app.stylist.persona import (
@@ -38,18 +37,15 @@ Return ONLY a JSON object: {{"category": "<preferences|skip|other>"}}
 
 async def _classify_preference_response(message: str) -> str:
     """Classify whether the user message is preferences, skip, or other."""
-    chat_client = get_chat_client()
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    raw = await chat_complete(
         messages=[
             {"role": "system", "content": "Classify user responses to a preference prompt."},
             {"role": "user", "content": _CLASSIFY_PROMPT.format(message=message)},
         ],
-        response_format={"type": "json_object"},
         max_tokens=50,
+        json_mode=True,
     )
-    raw = resp.choices[0].message.content or "{}"
-    data = json.loads(raw)
+    data = json.loads(raw or "{}")
     category = data.get("category", "other")
     if category not in ("preferences", "skip", "other"):
         return "other"
@@ -91,7 +87,7 @@ async def preference_collection_node(state: AgentState) -> dict:
         logger.info("[PreferenceCollection] User skipped preferences")
         return {
             "response": StylistResponse(
-                answer="No problem! You can always update your preferences later.\n\n" + WELCOME_MESSAGE,
+                answer="No problem! You can always update your preferences later.\n\n" + POST_PREFERENCE_MESSAGE,
                 intent=intent,
                 quick_replies=WELCOME_QUICK_REPLIES,
             ),
@@ -103,7 +99,7 @@ async def preference_collection_node(state: AgentState) -> dict:
         logger.info("[PreferenceCollection] Non-preference message, generating persona and moving on")
         return {
             "response": StylistResponse(
-                answer="Sure, let's get started!\n\n" + WELCOME_MESSAGE,
+                answer="Sure, let's get started!\n\n" + POST_PREFERENCE_MESSAGE,
                 intent=intent,
                 quick_replies=WELCOME_QUICK_REPLIES,
             ),
@@ -117,10 +113,10 @@ async def preference_collection_node(state: AgentState) -> dict:
 
     if updated_keys:
         keys_str = ", ".join(updated_keys)
-        answer = f"Got it! I've noted your preferences ({keys_str}).\n\n" + WELCOME_MESSAGE
+        answer = f"Got it! I've noted your preferences ({keys_str}).\n\n" + POST_PREFERENCE_MESSAGE
     else:
         await summarize_persona(db_session, user_profile, user_preferences)
-        answer = "Thanks for sharing! I'll use context as we shop.\n\n" + WELCOME_MESSAGE
+        answer = "Thanks for sharing! I'll use context as we shop.\n\n" + POST_PREFERENCE_MESSAGE
 
     logger.info(f"[PreferenceCollection] Preferences saved: {updated_keys}")
     return {

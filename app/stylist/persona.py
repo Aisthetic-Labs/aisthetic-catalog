@@ -4,8 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.stylist.models_user import UserProfile, UserPreferences
-from app.llm.client import get_chat_client
-from app.core.config import settings
+from app.llm.client import chat_complete
 
 
 async def find_user_profile(
@@ -56,9 +55,7 @@ async def summarize_persona(
         f"Preferences: {json.dumps(prefs_for_prompt, default=str)}"
     )
 
-    chat_client = get_chat_client()
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    persona_json = await chat_complete(
         messages=[
             {
                 "role": "system",
@@ -83,11 +80,10 @@ async def summarize_persona(
                 "content": f"PROFILE:\n{profile_text}",
             },
         ],
-        response_format={"type": "json_object"},
         max_tokens=500,
+        json_mode=True,
     )
-
-    persona_json = resp.choices[0].message.content or "{}"
+    persona_json = persona_json or "{}"
     # write persona_summary back into preferences JSONB
     updated = dict(user_prefs.preferences or {})
     updated["persona_summary"] = persona_json
@@ -127,9 +123,7 @@ async def extract_preferences_from_text(message: str) -> dict:
     LLM call that pulls structured preference keys from free-form text.
     Returns {} when nothing useful can be extracted.
     """
-    chat_client = get_chat_client()
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    raw = await chat_complete(
         messages=[
             {
                 "role": "system",
@@ -150,11 +144,10 @@ async def extract_preferences_from_text(message: str) -> dict:
             },
             {"role": "user", "content": message},
         ],
-        response_format={"type": "json_object"},
         max_tokens=300,
+        json_mode=True,
     )
-    raw = resp.choices[0].message.content or "{}"
-    return json.loads(raw)
+    return json.loads(raw or "{}")
 
 
 async def apply_extracted_preferences(

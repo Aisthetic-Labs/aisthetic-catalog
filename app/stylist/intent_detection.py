@@ -1,7 +1,6 @@
 import json
 
-from app.core.config import settings
-from app.llm.client import get_chat_client
+from app.llm.client import chat_complete
 from .intents import STYLIST_INTENTS, StylistIntent
 
 INTENT_PROMPT = """
@@ -21,23 +20,19 @@ Do NOT explain anything.
 
 
 async def detect_intent(message: str) -> StylistIntent:
-    chat_client = get_chat_client()
     content = INTENT_PROMPT.format(
         intents=json.dumps(STYLIST_INTENTS),
         qs=message
     )
 
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    raw = await chat_complete(
         messages=[
             {"role": "system", "content": "Classify fashion shopping intents."},
             {"role": "user", "content": content},
         ],
-        response_format={"type": "json_object"},
         max_tokens=200,
+        json_mode=True,
     )
-
-    raw = resp.choices[0].message.content or "{}"
     data = json.loads(raw)
     name = data.get("name") or StylistIntent.GENERAL_STYLING.value
 

@@ -1,8 +1,7 @@
 import json
 from uuid import UUID
 
-from app.core.config import settings
-from app.llm.client import get_chat_client
+from app.llm.client import chat_complete
 from app.logger import logger
 from app.stylist.dto import StylistResponse
 from app.stylist.intents import StylistIntent
@@ -100,19 +99,15 @@ async def shortlist_node(state: AgentState) -> dict:
         user_message=message,
     )
 
-    chat_client = get_chat_client()
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    raw = await chat_complete(
         messages=[
             {"role": "system", "content": "Resolve shortlist operations and product references."},
             {"role": "user", "content": prompt},
         ],
-        response_format={"type": "json_object"},
         max_tokens=300,
+        json_mode=True,
     )
-
-    raw = resp.choices[0].message.content or "{}"
-    parsed = json.loads(raw)
+    parsed = json.loads(raw or "{}")
     operation = parsed.get("operation", "show")
     resolved_ids = parsed.get("resolved_product_ids", [])
     explanation = parsed.get("explanation", "")

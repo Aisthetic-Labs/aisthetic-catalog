@@ -2,8 +2,7 @@ import json
 from typing import List, Dict, Any, Optional, Literal
 
 from pydantic import BaseModel, field_validator
-from app.llm.client import get_chat_client
-from app.core.config import settings
+from app.llm.client import chat_complete
 from app.logger import logger
 
 
@@ -71,8 +70,6 @@ async def complete_stylist_query(
     last_message: str,
     product_context: str = "",
 ) -> CompletedStylistQuery:
-    chat_client = get_chat_client()
-
     payload: Dict[str, Any] = {
         "conversation": [h.model_dump() for h in history],
         "last_human_message": last_message,
@@ -80,8 +77,7 @@ async def complete_stylist_query(
     }
     logger.info(f"Qcompletion payload: {payload}")
 
-    resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    raw = await chat_complete(
         messages=[
             {"role": "system", "content": QUERY_COMPLETION_INSTRUCTIONS.strip()},
             {
@@ -89,11 +85,9 @@ async def complete_stylist_query(
                 "content": json.dumps(payload),
             },
         ],
-        response_format={"type": "json_object"},
         max_tokens=400,
+        json_mode=True,
     )
-
-    raw = resp.choices[0].message.content or "{}"
-    data = json.loads(raw)
+    data = json.loads(raw or "{}")
     logger.info(f"Qcompletion data: {data}")
     return CompletedStylistQuery(**data)

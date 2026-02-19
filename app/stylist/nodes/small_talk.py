@@ -1,5 +1,4 @@
-from app.core.config import settings
-from app.llm.client import get_chat_client
+from app.llm.client import chat_complete
 from app.logger import logger
 from app.stylist.dto import StylistResponse
 from app.stylist.state import AgentState
@@ -12,9 +11,7 @@ async def small_talk_node(state: AgentState) -> dict:
     message = state["message"]
     intent = state["intent"]
 
-    chat_client = get_chat_client()
-    completions_resp = await chat_client.chat.completions.create(
-        model=settings.STYLIST_MODEL_NAME,
+    answer = await chat_complete(
         messages=[
             {
                 "role": "system",
@@ -29,7 +26,6 @@ async def small_talk_node(state: AgentState) -> dict:
         ],
         max_tokens=400,
     )
-    answer = completions_resp.choices[0].message.content or ""
 
     response = StylistResponse(
         answer=answer,
