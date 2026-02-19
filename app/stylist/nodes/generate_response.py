@@ -37,11 +37,9 @@ def _assemble_response(
         image_url = product.get("image_url") or (product.get("images", [None])[0] if product.get("images") else None)
         color = product.get("color")
 
-        # Formatted line for answer text
-        brand_str = f" by {brand}" if brand else ""
-        answer_parts.append(f"**{i}. {title}**{brand_str} — ₹{price:,.0f}")
-        answer_parts.append(f"{reason}")
-        answer_parts.append("")
+        # Compact bullet for answer text (FE shows full product cards separately)
+        brand_str = f" ({brand})" if brand else ""
+        answer_parts.append(f"- **{title}**{brand_str} — {reason}")
 
         recommended_products.append(ProductRecommendation(
             product_id=UUID(pid), title=title, brand=brand,
@@ -50,6 +48,7 @@ def _assemble_response(
         ))
 
     if closing:
+        answer_parts.append("")
         answer_parts.append(closing)
 
     return StylistResponse(
@@ -97,7 +96,7 @@ async def generate_response_node(state: AgentState) -> dict:
 
         "Recommendation guidelines:\n"
         "- When candidates are available, recommend at least 4 products to give the customer enough to compare. If fewer than 4 candidates exist, recommend all of them.\n"
-        "- For each recommended product, write a brief 'reason' explaining WHY it works — reference the customer's style, occasion, fabric, fit, color, or persona.\n"
+        "- The customer's app shows product cards with images, titles, and prices side by side. Your 'reason' should NOT repeat the title or price — instead write a short (1-line) comparative differentiator: what makes THIS pick stand out vs the others. Focus on fit, fabric, occasion, styling angle, or why it suits their persona.\n"
         "- Recommend only from the candidate_products list. Never invent products.\n"
         "- Avoid recommending products already in the customer's shortlist.\n"
         "- If nothing fits well, say so honestly in 'opening' and set recommendations to [].\n"
