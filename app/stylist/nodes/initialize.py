@@ -15,8 +15,9 @@ async def initialize_node(state: AgentState) -> dict:
     Gathers basic context: persona summary, user profile, chat context, and intent.
     This runs at the start of every request.
 
-    If the user profile is not found, or persona is empty, routes to ONBOARDING
-    so the graph can handle preference collection (or tell the user to register).
+    If the user profile is not found, or persona is empty, routes to
+    PREFERENCE_COLLECTION so the graph can collect preferences (or tell
+    the user to register).
     """
     db_session = state["db_session"]
     external_user_id = state["external_user_id"]
@@ -26,12 +27,12 @@ async def initialize_node(state: AgentState) -> dict:
 
     store = get_session_store()
 
-    # 0) Check for active onboarding flow (e.g. awaiting_preferences)
-    onboarding = await store.get_onboarding_state(chat_session_id)
-    if onboarding:
-        logger.info(f"[AgentFlow] Active onboarding (step={onboarding['step']}), skipping normal init")
+    # 0) Check for active preference collection flow
+    pref_state = await store.get_onboarding_state(chat_session_id)
+    if pref_state:
+        logger.info(f"[AgentFlow] Active preference collection (step={pref_state['step']}), skipping normal init")
         return {
-            "intent": StylistIntent.ONBOARDING,
+            "intent": StylistIntent.PREFERENCE_COLLECTION,
             "search_iteration": 0,
             "shortlist_product_ids": [],
         }
@@ -40,9 +41,9 @@ async def initialize_node(state: AgentState) -> dict:
     user_profile = await find_user_profile(db_session, external_user_id)
 
     if user_profile is None:
-        logger.info("[AgentFlow] User not found, routing to onboarding (not registered)")
+        logger.info("[AgentFlow] User not found, routing to preference_collection (not registered)")
         return {
-            "intent": StylistIntent.ONBOARDING,
+            "intent": StylistIntent.PREFERENCE_COLLECTION,
             "search_iteration": 0,
             "shortlist_product_ids": [],
         }
@@ -53,10 +54,10 @@ async def initialize_node(state: AgentState) -> dict:
     # 3) Check persona summary — if empty, ask for preferences
     persona = (user_preferences.preferences or {}).get("persona_summary")
     if not persona:
-        logger.info("[AgentFlow] Empty persona, routing to onboarding for preference collection")
+        logger.info("[AgentFlow] Empty persona, routing to preference_collection")
         await store.set_onboarding_state(chat_session_id, step="awaiting_preferences")
         return {
-            "intent": StylistIntent.ONBOARDING,
+            "intent": StylistIntent.PREFERENCE_COLLECTION,
             "user_preferences": user_preferences,
             "search_iteration": 0,
             "shortlist_product_ids": [],

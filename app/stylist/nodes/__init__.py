@@ -6,7 +6,7 @@ from .small_talk import small_talk_node
 from .try_on import try_on_node
 from .finalize import finalize_node
 from .follow_up import follow_up_node
-from .onboarding import onboarding_node
+from .preference_collection import preference_collection_node
 from .occasion_styling import occasion_styling_node
 from .shortlist import shortlist_node
 from .trend_enrichment import trend_enrichment_node
@@ -20,7 +20,7 @@ __all__ = [
     "try_on_node",
     "finalize_node",
     "follow_up_node",
-    "onboarding_node",
+    "preference_collection_node",
     "occasion_styling_node",
     "shortlist_node",
     "trend_enrichment_node",

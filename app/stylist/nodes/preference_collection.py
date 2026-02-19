@@ -56,19 +56,19 @@ WELCOME_QUICK_REPLIES = [
 # Main node
 # ---------------------------------------------------------------------------
 
-async def onboarding_node(state: AgentState) -> dict:
+async def preference_collection_node(state: AgentState) -> dict:
     """
-    Single-step conversational onboarding:
+    Single-step conversational preference collection:
     - Not registered → tell user to register
     - awaiting_preferences + skip → clear state, welcome
     - awaiting_preferences + text → extract & save preferences, welcome
     """
-    logger.info("[AgentFlow] Entering onboarding_node")
+    logger.info("[AgentFlow] Entering preference_collection_node")
     db_session = state["db_session"]
     external_user_id = state["external_user_id"]
     chat_session_id = state["chat_session_id"]
     message = (state.get("message") or "").strip()
-    intent = StylistIntent.ONBOARDING
+    intent = StylistIntent.PREFERENCE_COLLECTION
 
     store = get_session_store()
     user_preferences = state.get("user_preferences")
@@ -78,7 +78,7 @@ async def onboarding_node(state: AgentState) -> dict:
         # Double-check: maybe profile genuinely doesn't exist
         user_profile = await find_user_profile(db_session, external_user_id)
         if user_profile is None:
-            logger.info("[Onboarding] User not registered")
+            logger.info("[PreferenceCollection] User not registered")
             return {
                 "response": StylistResponse(
                     answer=NOT_REGISTERED_MESSAGE,
@@ -104,7 +104,7 @@ async def onboarding_node(state: AgentState) -> dict:
     # ── User skips ────────────────────────────────────────────────────
     if step == "awaiting_preferences" and message.lower() in ("skip", "skip this"):
         await store.clear_onboarding_state(chat_session_id)
-        logger.info("[Onboarding] User skipped preferences")
+        logger.info("[PreferenceCollection] User skipped preferences")
         return {
             "response": StylistResponse(
                 answer=(
@@ -140,7 +140,7 @@ async def onboarding_node(state: AgentState) -> dict:
                 "What are you shopping for today?"
             )
 
-        logger.info(f"[Onboarding] Preferences saved: {updated_keys}")
+        logger.info(f"[PreferenceCollection] Preferences saved: {updated_keys}")
         return {
             "response": StylistResponse(
                 answer=answer,
@@ -151,7 +151,7 @@ async def onboarding_node(state: AgentState) -> dict:
         }
 
     # ── Fallback (shouldn't happen) ───────────────────────────────────
-    logger.warning(f"[Onboarding] Unexpected state step={step}, message={message!r}")
+    logger.warning(f"[PreferenceCollection] Unexpected state step={step}, message={message!r}")
     await store.clear_onboarding_state(chat_session_id)
     return {
         "response": StylistResponse(

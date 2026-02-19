@@ -11,7 +11,7 @@ from app.stylist.nodes import (
     try_on_node,
     finalize_node,
     follow_up_node,
-    onboarding_node,
+    preference_collection_node,
     occasion_styling_node,
     shortlist_node,
     trend_enrichment_node,
@@ -24,8 +24,8 @@ def route_intent(state: AgentState) -> str:
     """
     intent = state["intent"]
     logger.info(f"[AgentFlow] Routing based on intent: {intent.value}")
-    if intent == StylistIntent.ONBOARDING:
-        return "onboarding"
+    if intent == StylistIntent.PREFERENCE_COLLECTION:
+        return "preference_collection"
     if intent == StylistIntent.OCCASION_STYLING:
         return "occasion_styling"
     if intent in (StylistIntent.DIRECT_PRODUCT_SEARCH, StylistIntent.GENERAL_STYLING):
@@ -79,7 +79,7 @@ def create_stylist_graph():
     workflow.add_node("small_talk", small_talk_node)
     workflow.add_node("try_on", try_on_node)
     workflow.add_node("finalize", finalize_node)
-    workflow.add_node("onboarding", onboarding_node)
+    workflow.add_node("preference_collection", preference_collection_node)
     workflow.add_node("shortlist", shortlist_node)
     workflow.add_node("trend_enrichment", trend_enrichment_node)
 
@@ -96,7 +96,7 @@ def create_stylist_graph():
             "try_on": "try_on",
             "follow_up": "follow_up",
             "shortlist": "shortlist",
-            "onboarding": "onboarding",
+            "preference_collection": "preference_collection",
         }
     )
 
@@ -125,7 +125,7 @@ def create_stylist_graph():
     workflow.add_edge("profile_update", "finalize")
     workflow.add_edge("small_talk", "finalize")
     workflow.add_edge("try_on", "finalize")
-    workflow.add_edge("onboarding", "finalize")
+    workflow.add_edge("preference_collection", "finalize")
     workflow.add_edge("shortlist", "finalize")
     workflow.add_edge("finalize", END)
 

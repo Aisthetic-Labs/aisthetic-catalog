@@ -11,7 +11,7 @@ class StylistIntent(str, Enum):
     TRY_ON_REQUEST = "try_on_request"  # for future
     SHORTLIST_MANAGEMENT = "shortlist_management"
     FOLLOW_UP = "follow_up"
-    ONBOARDING = "onboarding"  # internal only, never LLM-detected
+    PREFERENCE_COLLECTION = "preference_collection"  # internal only, never LLM-detected
 
 
 STYLIST_INTENTS = [
