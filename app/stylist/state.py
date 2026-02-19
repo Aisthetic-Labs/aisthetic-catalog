@@ -34,7 +34,7 @@ class AgentState(TypedDict):
     
     # --- Enrichment Fields ---
     user_memories: Optional[List[dict]]  # mem0 recalled memories for this user
-    trend_context: Optional[str]  # Brave Search results for trend queries
+    trend_context: Optional[str]  # Web search results for trend queries
 
     # --- Output Fields ---
     response: Optional[StylistResponse]  # Final response returned to API

@@ -14,3 +14,4 @@ replicate>=0.31.0
 redis>=5.0.1
 langgraph
 mem0ai>=0.1.0
+tavily-python>=0.5.0
