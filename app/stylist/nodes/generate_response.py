@@ -65,7 +65,7 @@ async def generate_response_node(state: AgentState) -> dict:
     Calls the Stylist LLM to generate the final response message.
     It takes persona, candidate products, and chat context into account.
     """
-    logger.info(f"[AgentFlow] Entering generate_response_node")
+    logger.info("[AgentFlow] Entering generate_response_node")
     persona_json = (state["user_preferences"].preferences or {}).get("persona_summary", "{}")
     candidate_products = state["candidate_products"]
     intent = state["intent"]

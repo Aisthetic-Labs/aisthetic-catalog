@@ -6,7 +6,7 @@ async def try_on_node(state: AgentState) -> dict:
     """
     Handoff for virtual try-on requests. (Future functionality)
     """
-    logger.info(f"[AgentFlow] Entering try_on_node")
+    logger.info("[AgentFlow] Entering try_on_node")
 
     answer = (
         "I can help you choose what to try, and soon I'll be able to show it on you. "

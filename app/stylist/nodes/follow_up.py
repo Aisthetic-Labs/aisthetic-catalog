@@ -1,6 +1,5 @@
-import json
 from app.logger import logger
-from app.stylist.query_completion import ChatTurn, complete_stylist_query, CompletedStylistQuery
+from app.stylist.query_completion import ChatTurn, complete_stylist_query
 from app.stylist.state import AgentState
 
 async def follow_up_node(state: AgentState) -> dict:

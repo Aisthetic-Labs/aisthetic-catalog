@@ -8,7 +8,7 @@ async def small_talk_node(state: AgentState) -> dict:
     """
     Handles non-catalog related queries (greetings, general help, personality).
     """
-    logger.info(f"[AgentFlow] Entering small_talk_node")
+    logger.info("[AgentFlow] Entering small_talk_node")
     message = state["message"]
     intent = state["intent"]
 

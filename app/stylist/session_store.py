@@ -7,7 +7,6 @@ from typing import Any
 
 from app.core.config import settings
 from app.core.redis import get_redis_client
-from app.logger import logger
 
 SessionData = dict[str, Any]
 

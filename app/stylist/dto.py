@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
-from app.catalog.dto import CatalogFilter
 from .intents import StylistIntent
 
 

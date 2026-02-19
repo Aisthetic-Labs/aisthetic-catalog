@@ -10,7 +10,7 @@ async def finalize_node(state: AgentState) -> dict:
     The final step: commits the transaction and updates the chat session
     history in Redis.
     """
-    logger.info(f"[AgentFlow] Entering finalize_node")
+    logger.info("[AgentFlow] Entering finalize_node")
     db_session = state["db_session"]
     response = state["response"]
     intent = state["intent"]
