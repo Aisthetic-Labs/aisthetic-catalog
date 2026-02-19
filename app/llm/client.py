@@ -61,4 +61,17 @@ async def _anthropic_complete(messages, max_tokens) -> str:
     if system:
         kwargs["system"] = system
     resp = await client.messages.create(**kwargs)
-    return resp.content[0].text or ""
+    text = resp.content[0].text or ""
+    return _strip_markdown_fences(text)
+
+
+def _strip_markdown_fences(text: str) -> str:
+    """Remove ```json ... ``` or ``` ... ``` wrappers Claude sometimes adds."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        # drop the opening fence line (```json or ```)
+        stripped = stripped[stripped.index("\n") + 1:] if "\n" in stripped else stripped[3:]
+        # drop the closing fence
+        if stripped.endswith("```"):
+            stripped = stripped[: stripped.rfind("```")]
+    return stripped.strip()
