@@ -32,7 +32,7 @@ async def recall_memories(user_id: str, query: str, limit: int = 5) -> list[dict
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(
             None,
-            partial(client.search, query, user_id=user_id, limit=limit),
+            partial(client.search, query, filters={"user_id": user_id}, limit=limit),
         )
         memories = [
             {"memory": r.get("memory", ""), "score": r.get("score", 0)}
