@@ -5,9 +5,7 @@ from app.stylist.intents import StylistIntent
 from app.stylist.persona import (
     find_user_profile,
     get_or_create_user_preferences,
-    summarize_persona,
 )
-from app.stylist.session_store import get_session_store
 from app.stylist.shortlist_service import get_shortlist_service
 from app.stylist.state import AgentState
 
@@ -16,27 +14,14 @@ async def initialize_node(state: AgentState) -> dict:
     Gathers basic context: persona summary, user profile, chat context, and intent.
     This runs at the start of every request.
 
-    If the user profile is not found, or persona is empty, routes to
-    PREFERENCE_COLLECTION so the graph can collect preferences (or tell
-    the user to register).
+    If the persona summary is empty, routes to PREFERENCE_COLLECTION
+    so the graph can collect preferences.
     """
     db_session = state["db_session"]
     external_user_id = state["external_user_id"]
     chat_session_id = state["chat_session_id"]
 
     logger.info(f"[AgentFlow] Entering initialize_node for user={external_user_id}")
-
-    store = get_session_store()
-
-    # 0) Check for active preference collection flow
-    pref_state = await store.get_onboarding_state(chat_session_id)
-    if pref_state:
-        logger.info(f"[AgentFlow] Active preference collection (step={pref_state['step']}), skipping normal init")
-        return {
-            "intent": StylistIntent.PREFERENCE_COLLECTION,
-            "search_iteration": 0,
-            "shortlist_product_ids": [],
-        }
 
     # 1) Look up user profile — must exist (validated in route handler)
     user_profile = await find_user_profile(db_session, external_user_id)
@@ -50,27 +35,16 @@ async def initialize_node(state: AgentState) -> dict:
     # 2) Get/Create Preferences
     user_preferences = await get_or_create_user_preferences(db_session, user_profile.id)
 
-    # 3) Ensure persona summary exists
+    # 3) If persona summary is empty, route to preference collection
     persona = (user_preferences.preferences or {}).get("persona_summary")
     if not persona:
-        # Check if profile has enough data to generate persona directly
-        has_profile_data = any([user_profile.gender, user_profile.fashion_taste])
-        pref_keys = {k for k in (user_preferences.preferences or {}) if k != "persona_summary"}
-
-        if has_profile_data or pref_keys:
-            # Profile has data from registration — generate persona, skip prompt
-            logger.info("[AgentFlow] Generating persona from existing profile data")
-            await summarize_persona(db_session, user_profile, user_preferences)
-        else:
-            # Truly bare profile — ask for preferences
-            logger.info("[AgentFlow] Empty persona and bare profile, routing to preference_collection")
-            await store.set_onboarding_state(chat_session_id, step="awaiting_preferences")
-            return {
-                "intent": StylistIntent.PREFERENCE_COLLECTION,
-                "user_preferences": user_preferences,
-                "search_iteration": 0,
-                "shortlist_product_ids": [],
-            }
+        logger.info("[AgentFlow] Empty persona summary, routing to preference_collection")
+        return {
+            "intent": StylistIntent.PREFERENCE_COLLECTION,
+            "user_preferences": user_preferences,
+            "search_iteration": 0,
+            "shortlist_product_ids": [],
+        }
 
     logger.info("[AgentFlow] Persona context ready")
 
