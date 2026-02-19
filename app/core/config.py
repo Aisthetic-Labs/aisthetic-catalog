@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     MEM0_API_KEY: str = Field(default="")
     MEM0_ENABLED: bool = Field(default=True)
 
+    # CORS
+    CORS_ORIGINS: str = Field(default="")  # comma-separated extra origins
+
     # Tavily Search (trend awareness)
     TAVILY_API_KEY: str = Field(default="")
     TAVILY_SEARCH_ENABLED: bool = Field(default=True)
