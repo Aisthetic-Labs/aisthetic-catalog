@@ -112,7 +112,7 @@ async def preference_collection_node(state: AgentState) -> dict:
     # ── preferences: extract, apply, and generate persona ─────────────
     extracted = await extract_preferences_from_text(message)
     updated_keys = await apply_extracted_preferences(
-        db_session, user_profile, user_preferences, extracted,
+        db_session, user_preferences, extracted,
     )
 
     if updated_keys:

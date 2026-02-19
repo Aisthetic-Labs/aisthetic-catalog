@@ -121,9 +121,6 @@ async def update_user_preferences(
 
 # ── Conversational preference extraction ──────────────────────────────
 
-# Fields that live on the UserProfile table (not in JSONB)
-_PROFILE_FIELDS = {"gender"}
-
 
 async def extract_preferences_from_text(message: str) -> dict:
     """
@@ -140,7 +137,7 @@ async def extract_preferences_from_text(message: str) -> dict:
                     "You are a fashion preference extractor. Given a user message, "
                     "extract any style preferences into a flat JSON object.\n\n"
                     "Possible keys (only include those clearly expressed):\n"
-                    "  gender, liked_colors (list), disliked_colors (list),\n"
+                    "  liked_colors (list), disliked_colors (list),\n"
                     "  liked_fits (list), preferred_sizes (list), body_type,\n"
                     "  price_sensitivity, height_weight, preferred_shoe_size,\n"
                     "  preferred_bottom_sizes (list).\n\n"
@@ -162,41 +159,11 @@ async def extract_preferences_from_text(message: str) -> dict:
 
 async def apply_extracted_preferences(
     session: AsyncSession,
-    user_profile: UserProfile,
     user_prefs: UserPreferences,
     extracted: dict,
 ) -> list[str]:
-    """
-    Split *extracted* data: profile-level fields go to UserProfile columns,
-    everything else goes to UserPreferences JSONB. Re-generates persona.
-
-    Returns a list of human-readable key names that were updated.
-    """
+    """Save all extracted preferences into UserPreferences JSONB."""
     if not extracted:
         return []
-
-    updated_keys: list[str] = []
-
-    # 1) Profile-level columns
-    profile_changed = False
-    for field in _PROFILE_FIELDS:
-        if field in extracted:
-            setattr(user_profile, field, extracted[field])
-            updated_keys.append(field.replace("_", " "))
-            profile_changed = True
-
-    if profile_changed:
-        session.add(user_profile)
-        await session.flush()
-
-    # 2) Preference-level (JSONB)
-    pref_changes = {k: v for k, v in extracted.items() if k not in _PROFILE_FIELDS}
-    if pref_changes:
-        updated_keys.extend(k.replace("_", " ") for k in pref_changes)
-        await update_user_preferences(session, user_prefs, pref_changes)
-
-    # If only profile fields changed, still regenerate persona
-    if profile_changed and not pref_changes:
-        await summarize_persona(session, user_profile, user_prefs)
-
-    return updated_keys
+    await update_user_preferences(session, user_prefs, extracted)
+    return [k.replace("_", " ") for k in extracted]
